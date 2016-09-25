@@ -107,10 +107,10 @@ public class ZipList{
 	public boolean equals(Object o){
 		if(o == this) return true;
 		if(!(o instanceof ZipList)) return false;
-		ZipList o1 = (ZipList)o;
-		if(o1.blobSize != this.blobSize || o1.entrySize != this.entrySize) return false;
+		ZipList other = (ZipList)o;
+		if(other.blobSize != this.blobSize || other.entrySize != this.entrySize) return false;
 		for(int i = 0; i < this.blobSize;++i){
-			if(o1.content[i] != this.content[i]) return false;
+			if(other.content[i] != this.content[i]) return false;
 		}
 		return true;
 	}
