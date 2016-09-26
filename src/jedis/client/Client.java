@@ -2,6 +2,7 @@ package jedis.client;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -11,19 +12,60 @@ import java.util.Scanner;
 import java.util.Set;
 
 public class Client {
-	
-	private Selector connectionSelector;
-	private Selector dataSelector;
+	private Selector clientSelector;
 	private SocketChannel clientSocket;
+	private String serverIP;
+	private int serverPort;
 	
-	public boolean init(){
+	private void init(){
+		this.serverIP = "127.0.0.1";
+		this.serverPort = 8081;
+	}
+	
+	private String prepareCommand(String command){
+		String preparedCommand = command == null ? new String() : command.trim();
+		if(preparedCommand.length() > 0 && preparedCommand.charAt(0) == '>'){
+			preparedCommand = preparedCommand.substring(1);
+		}
+		return preparedCommand;
+	}
+	
+	private boolean writeCommandLengthToBuffer(ByteBuffer buffer,int length){
+		buffer.put((byte)(length | (255<<24)));
+		buffer.put((byte)(length | (255<<16)));
+		buffer.put((byte)(length | (255<<8)));
+		buffer.put((byte)(length | 255));
+		return true;
+	}
+	
+	private boolean writeCommandToBuffer(ByteBuffer buffer,String command){
+		int length = command.length();
+		for(int i = 0; i < length;++i){
+			buffer.put((byte)command.charAt(i));
+		}
+		return true;
+	}
+	
+	private ByteBuffer wrapCommandToBuffer(String command){
+		if(command == null || command.length() == 0) return ByteBuffer.allocate(0);
+	    int length = command.length();
+	    ByteBuffer buffer = ByteBuffer.allocate(length + 4);
+	    writeCommandLengthToBuffer(buffer, length);
+	    writeCommandToBuffer(buffer, command);
+	    buffer.flip();
+		return buffer;
+	}
+	
+	public boolean connect(){
+		init();
 		try {
-			connectionSelector = Selector.open();
-			dataSelector = Selector.open();
 			clientSocket = SocketChannel.open();
+			clientSocket.configureBlocking(true);
+			clientSelector = Selector.open();
+			clientSocket.connect(new InetSocketAddress(this.serverIP,this.serverPort));
+			clientSocket.finishConnect();
 			clientSocket.configureBlocking(false);
-			clientSocket.register(connectionSelector, SelectionKey.OP_CONNECT);
-			clientSocket.register(dataSelector, SelectionKey.OP_READ);
+			clientSocket.register(clientSelector, SelectionKey.OP_READ);
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.exit(-1);
@@ -31,60 +73,18 @@ public class Client {
 		return true;
 	}
 	
-	void handleConnectedEvent(SelectionKey key){
-		try {
-			clientSocket.finishConnect();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
-	
 	public void start(){
 		try {
-			clientSocket.connect(new InetSocketAddress("127.0.0.1", 8081));
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-			System.exit(-1);
-		}
-	}
-	
-	public static void main(String[] args){
-		Client client = new Client();
-		try {
-			client.clientSocket = SocketChannel.open();
-			client.clientSocket.configureBlocking(true);
-			client.dataSelector = Selector.open();
-			client.clientSocket.connect(new InetSocketAddress("127.0.0.1", 8081));
-			if(client.clientSocket.finishConnect()){
-				System.out.println("Connected...");
-			}else{
-				System.out.println("Failed to connect");
-			}
-			
-			client.clientSocket.configureBlocking(false);
-			client.clientSocket.register(client.dataSelector, SelectionKey.OP_READ);
 			Scanner scanner = new Scanner(System.in);
 			while(scanner.hasNext()){
 				String line = scanner.nextLine();
-				byte[] command = line.trim().getBytes();
-				System.out.println("Got : " + line);
-				int length = command.length;
-				ByteBuffer buffer = ByteBuffer.allocate(length + 4);
-				byte[] lenghtByte = new byte[4];
-				lenghtByte[0]= (byte)(length | (255<<24));
-				lenghtByte[1]= (byte)(length | (255<<16));
-				lenghtByte[2]= (byte)(length | (255<<8));
-				lenghtByte[3]= (byte)(length | 255);
-				buffer.put(lenghtByte);
-				buffer.put(command);
-				buffer.flip();
+				String command = prepareCommand(line);
+				ByteBuffer buffer = wrapCommandToBuffer(command);
 				while(buffer.hasRemaining()){
-					client.clientSocket.write(buffer);
+					clientSocket.write(buffer);
 				}
-				client.dataSelector.select();
-				Set<SelectionKey> selectionKeys = client.dataSelector.selectedKeys();
+				clientSelector.select();
+				Set<SelectionKey> selectionKeys = clientSelector.selectedKeys();
 				Iterator<SelectionKey> iterator = selectionKeys.iterator();
 				while(iterator.hasNext()){
 					SelectionKey key = iterator.next();
@@ -106,5 +106,11 @@ public class Client {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+	}
+	
+	public static void main(String[] args){
+		Client client = new Client();
+		client.connect();
+		client.start();
 	}
 }
