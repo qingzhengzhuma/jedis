@@ -47,9 +47,8 @@ public class Server {
 	
 	private void removeClient(SocketChannel clientChannel){
 		try {
-			String IP = clientChannel.getLocalAddress().toString();
-			int port = clientChannel.socket().getLocalPort();
-			clients.remove(new Client(IP, port));
+			String address = clientChannel.getRemoteAddress().toString();
+			clients.remove(new Client(address));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -63,10 +62,10 @@ public class Server {
 			synchronized (lock) {
 				dataSelector.wakeup();
 				socketChannel.register(dataSelector,SelectionKey.OP_READ);
-				String IP = socketChannel.getLocalAddress().toString();
-				int port = socketChannel.socket().getLocalPort();
-				clients.put(new Client(IP, port),socketChannel);
 			}
+			String address = socketChannel.getRemoteAddress().toString();
+			clients.put(new Client(address),socketChannel);
+			System.out.println("Received Connection From " + address);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -89,15 +88,13 @@ public class Server {
 		SocketChannel dataChannel = (SocketChannel) key.channel();
 		ByteBuffer buffer = ByteBuffer.allocate(1024);
 		try {
-			String IP = dataChannel.getLocalAddress().toString();
-			int port = dataChannel.socket().getLocalPort();
+			String address = dataChannel.getRemoteAddress().toString();
 			int size = dataChannel.read(buffer);
 			if(size == -1){
-				clients.remove(new Client(IP, port));
+				clients.remove(new Client(address));
 			}else{
 				buffer.flip();
-				System.out.println("FROM " + IP + ":" + Integer.toString(port)
-				+ "##" + new String(buffer.array()));
+				System.out.println("FROM " + address + "##" + new String(buffer.array()));
 				processData(dataChannel, buffer.array());
 			}
 		} catch (IOException e) {
@@ -108,15 +105,17 @@ public class Server {
 	}
 	
 	private void handleConnectionEvent(){
-		System.out.println("listening...");
+		
 		while(!isStop){
 			try {
+				System.out.println("watting for connection...");
 				connectionSelector.select();
 				Set<SelectionKey> selecedKeys = connectionSelector.selectedKeys();
 				Iterator<SelectionKey> iterator = selecedKeys.iterator();
 				while(iterator.hasNext()){
 					SelectionKey key = iterator.next();
 					if(key.isAcceptable()){
+						System.out.println("comming");
 						handleAcception(key);
 					}
 				}
@@ -147,7 +146,7 @@ public class Server {
 		public void run(){
 			System.out.println("Waiting for data's coming...");
 			while(!isStop){
-				synchronized (lock) {
+				synchronized (lock) {}
 					try {
 						dataSelector.select();
 						Set<SelectionKey> selectedKeys = dataSelector.selectedKeys();
@@ -162,7 +161,7 @@ public class Server {
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
-				}
+				
 			}
 		}
 		
@@ -172,11 +171,9 @@ public class Server {
 	}
 	
 	class Client{
-		private String IP;
-		private int port;
-		public Client(String IP,int port) {
-			this.IP = IP;
-			this.port = port;
+		private String address;
+		public Client(String address) {
+			this.address = address;
 		}
 		
 		@Override
@@ -184,20 +181,17 @@ public class Server {
 			if(o == this) return true;
 			if(!(o instanceof Client)) return false;
 			Client client = (Client)o;
-			return client.IP.equals(this.IP) && client.port == this.port;
+			return client.address.equals(this.address);
 		}
 		
 		@Override
 		public int hashCode(){
-			int hash = 23;
-			hash = hash*37 + this.IP.hashCode();
-			hash = hash*37 + this.port;
-			return hash;
+			return this.address.hashCode();
 		}
 		
 		@Override
 		public String toString(){
-			return this.IP + ":" + Integer.toString(this.port);
+			return this.address;
 		}
 	}
 
