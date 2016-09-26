@@ -14,13 +14,11 @@ import java.util.Set;
 
 public class Server {
 	
-	private Selector connectionSelector;
-	private Selector dataSelector;
+	private Selector serverSelector;
 	private Map<Client,SocketChannel> clients = new HashMap<>();
 	private ServerSocketChannel serverSocketChannel;
 	private final int LISTEN_PORT;
 	private boolean isStop = false;
-	private Object lock = new Object();
 	
 	public Server(){
 		LISTEN_PORT = getListenPort();
@@ -33,12 +31,11 @@ public class Server {
 	
 	public boolean init(){
 		try {
-			connectionSelector = Selector.open();
-			dataSelector = Selector.open();
+			serverSelector = Selector.open();
 			serverSocketChannel = ServerSocketChannel.open();
 			serverSocketChannel.socket().bind(new InetSocketAddress(LISTEN_PORT));
 			serverSocketChannel.configureBlocking(false);
-			serverSocketChannel.register(connectionSelector, SelectionKey.OP_ACCEPT);
+			serverSocketChannel.register(serverSelector, SelectionKey.OP_ACCEPT);
 		} catch (IOException e) {
 			System.exit(-1);
 		}
@@ -59,10 +56,7 @@ public class Server {
 		try {
 			SocketChannel socketChannel = server.accept();
 			socketChannel.configureBlocking(false);
-			synchronized (lock) {
-				dataSelector.wakeup();
-				socketChannel.register(dataSelector,SelectionKey.OP_READ);
-			}
+			socketChannel.register(serverSelector,SelectionKey.OP_READ);
 			String address = socketChannel.getRemoteAddress().toString();
 			clients.put(new Client(address),socketChannel);
 			System.out.println("Received Connection From " + address);
@@ -71,31 +65,42 @@ public class Server {
 		}
 	}
 	
-	private void processData(SocketChannel clientChannel,byte[] data){
-		ByteBuffer buffer = ByteBuffer.allocate(20);
-		buffer.put("received".getBytes());
-		while(buffer.hasRemaining()){
-			try {
-				clientChannel.write(buffer);
-			} catch (IOException e) {
-				e.printStackTrace();
-				removeClient(clientChannel);
-			}
-		}
+	private byte[] processCommand(SocketChannel clientChannel,byte[] data){
+		return "message received".getBytes();
 	}
 	
-	private void handleData(SelectionKey key){
-		SocketChannel dataChannel = (SocketChannel) key.channel();
+	private boolean sendResponse(SocketChannel clientChannel,
+			ByteBuffer responseBuffer,byte[] result){
+		int length = result.length;
+		if(responseBuffer == null || length > responseBuffer.capacity()){
+			responseBuffer = ByteBuffer.allocate(length);
+		}else{
+			responseBuffer.clear();
+		}
+		responseBuffer.put(result);
+		while(responseBuffer.hasRemaining()){
+			try {
+				clientChannel.write(responseBuffer);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	private void handleCommand(SelectionKey key){
+		SocketChannel clientChannel = (SocketChannel) key.channel();
 		ByteBuffer buffer = ByteBuffer.allocate(1024);
 		try {
-			String address = dataChannel.getRemoteAddress().toString();
-			int size = dataChannel.read(buffer);
+			int size = clientChannel.read(buffer);
 			if(size == -1){
-				clients.remove(new Client(address));
+				removeClient(clientChannel);
 			}else{
 				buffer.flip();
-				System.out.println("FROM " + address + "##" + new String(buffer.array()));
-				processData(dataChannel, buffer.array());
+				byte[] result = processCommand(clientChannel, buffer.array());
+				sendResponse(clientChannel, buffer, result);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -104,19 +109,18 @@ public class Server {
 		}
 	}
 	
-	private void handleConnectionEvent(){
-		
+	private void run(){
 		while(!isStop){
 			try {
-				System.out.println("watting for connection...");
-				connectionSelector.select();
-				Set<SelectionKey> selecedKeys = connectionSelector.selectedKeys();
+				serverSelector.select();
+				Set<SelectionKey> selecedKeys = serverSelector.selectedKeys();
 				Iterator<SelectionKey> iterator = selecedKeys.iterator();
 				while(iterator.hasNext()){
 					SelectionKey key = iterator.next();
 					if(key.isAcceptable()){
-						System.out.println("comming");
 						handleAcception(key);
+					}else if(key.isReadable()){
+						handleCommand(key);
 					}
 				}
 				iterator.remove();
@@ -129,45 +133,7 @@ public class Server {
 	public static void main(String[] args) {
 		Server server = new Server();
 		server.init();
-		DataHandleThread thread = server.new DataHandleThread();
-		thread.start();
-		server.handleConnectionEvent();
-		thread.tryStop();
-		try {
-			thread.join();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	class DataHandleThread extends Thread{
-		private boolean isStop = false;
-		@Override
-		public void run(){
-			System.out.println("Waiting for data's coming...");
-			while(!isStop){
-				synchronized (lock) {}
-					try {
-						dataSelector.select();
-						Set<SelectionKey> selectedKeys = dataSelector.selectedKeys();
-						Iterator<SelectionKey> iterator = selectedKeys.iterator();
-						while(iterator.hasNext()){
-							SelectionKey key = iterator.next();
-							if(key.isReadable()){
-								handleData(key);
-							}
-							iterator.remove();
-						}
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				
-			}
-		}
-		
-		public void tryStop() {
-			isStop = true;
-		}
+		server.run();
 	}
 	
 	class Client{
