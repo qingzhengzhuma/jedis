@@ -113,10 +113,16 @@ public class Server {
 		if(!isValidCommand(command)) return "Unkonwn Command".getBytes();
 		String address = getRemoteAddress(clientChannel);
 		if(clientSockets.containsKey(address) && clients.containsKey(address)){
-			CommandHandler handler = commandTable.get(command);
-			return handler.execute(databases,
-					clients.get(address),
-					new String(data)).getBytes();
+			try {
+				CommandHandler handler = commandTable.get(command);
+				byte[] result = handler.execute(databases,
+						clients.get(address),
+						new String(data)).getBytes();
+				return result;
+			} catch (UnsupportedOperationException e) {
+				// TODO: handle exception
+				return "Not Supported Operation".getBytes();
+			}
 		}
 		return new byte[0];
 	}
