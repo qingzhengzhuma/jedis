@@ -11,7 +11,7 @@ public class SetHandler implements CommandHandler{
 		}
 	}
 	private Entry parseKeyAndValue(String command){
-		String[] segs = command.split("\\s");
+		String[] segs = command.split("\\s+");
 		return new Entry(segs[1], new Sds(segs[2]));
 	}
 	

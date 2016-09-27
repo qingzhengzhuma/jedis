@@ -3,7 +3,7 @@ package jedis.util;
 public class GetHandler implements CommandHandler {
 	
 	private String parseKey(String command){
-		String key = command.split("\\s")[1];
+		String key = command.split("\\s+")[1];
 		return key;
 	}
 
