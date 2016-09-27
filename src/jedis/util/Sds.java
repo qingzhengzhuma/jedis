@@ -1,6 +1,6 @@
 package jedis.util;
 
-public class Sds{
+public class Sds implements JedisObject{
 	private int used;
 	private int free;
 	private char[] content;
@@ -156,6 +156,12 @@ public class Sds{
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 
+	}
+
+	@Override
+	public byte[] getBytes() {
+		// TODO Auto-generated method stub
+		return toString().getBytes();
 	}
 
 }
