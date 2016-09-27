@@ -6,14 +6,28 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Scanner;
 
+import jedis.util.CommandLine;
+
 public class JedisWorkbench {
 	private SocketChannel clientSocket;
 	private String serverIP;
 	private int serverPort;
 	
+	private CommandRule[] commandRules = {
+		new CommandRule("ping", 0, 0),
+		new CommandRule("select", 1, 1),
+		new CommandRule("set", 2, 2),
+		new CommandRule("get", 1, 1)
+	};
+	
 	private void init(){
 		this.serverIP = "127.0.0.1";
 		this.serverPort = 8081;
+		Runtime.getRuntime().addShutdownHook(new Thread(){
+			public void run() {
+				System.out.println();
+			}
+		});
 	}
 	
 	/**
@@ -46,10 +60,19 @@ public class JedisWorkbench {
 		if(command == null || command.length() == 0) return ByteBuffer.allocate(0);
 	    int length = command.length();
 	    ByteBuffer buffer = ByteBuffer.allocate(length + 4);
-	    writeCommandLengthToBuffer(buffer, length);
+	    //writeCommandLengthToBuffer(buffer, length);
 	    writeCommandToBuffer(buffer, command);
 	    buffer.flip();
 		return buffer;
+	}
+	
+	private boolean verifyCommand(String command,int argc){
+		for(CommandRule rule : commandRules){
+			if(command.equals(rule.command) && 
+					argc >= rule.minArgc && 
+					argc <= rule.maxArgc) return true;
+		}
+		return false;
 	}
 	
 	public boolean connect(){
@@ -60,7 +83,7 @@ public class JedisWorkbench {
 			clientSocket.connect(new InetSocketAddress(this.serverIP,this.serverPort));
 			clientSocket.finishConnect();
 		} catch (IOException e) {
-			e.printStackTrace();
+			System.out.println("Failed to connect to server");
 			System.exit(-1);
 		}
 		return true;
@@ -73,26 +96,32 @@ public class JedisWorkbench {
 		try {
 			while(scanner.hasNext()){
 				String line = scanner.nextLine();
-				String command = prepareCommand(line);
-				if(command.length() > 0){
-					ByteBuffer buffer = wrapCommandToBuffer(command);
-					while(buffer.hasRemaining()){
-						clientSocket.write(buffer);
+				if(CommandLine.parse(line)){
+					String command = CommandLine.getCommand().toLowerCase();
+					int argc = CommandLine.getArgc();
+					if(verifyCommand(command,argc) == true){
+						command = CommandLine.getNormalizedCmdLine();
+						ByteBuffer buffer = wrapCommandToBuffer(command);
+						while(buffer.hasRemaining()){
+							clientSocket.write(buffer);
+						}
+						ByteBuffer readBuffer = ByteBuffer.allocate(1024);
+						if(clientSocket.read(readBuffer) == -1){
+							System.out.println("Disconnected...");
+							System.exit(-1);
+						}
+						readBuffer.flip();
+						System.out.println(new String(readBuffer.array()));
+					}else{
+						System.out.println("ILLIGAL COMMAND");
 					}
-					ByteBuffer readBuffer = ByteBuffer.allocate(1024);
-					if(clientSocket.read(readBuffer) == -1){
-						System.out.println("Disconnected...");
-						System.exit(-1);
-					}
-					readBuffer.flip();
-					System.out.println(new String(readBuffer.array()));
 				}
 				System.out.print(promptSymbol);
 			}
 			scanner.close();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			System.out.println("Bye");
 		}
 	}
 	
@@ -100,5 +129,17 @@ public class JedisWorkbench {
 		JedisWorkbench client = new JedisWorkbench();
 		client.connect();
 		client.start();
+	}
+	
+	class CommandRule{
+		String command;
+		int minArgc;
+		int maxArgc;
+		public CommandRule(String command,int minArgc,int maxArgc) {
+			// TODO Auto-generated constructor stub
+			this.command = command;
+			this.minArgc = minArgc;
+			this.maxArgc = maxArgc;
+		}
 	}
 }
