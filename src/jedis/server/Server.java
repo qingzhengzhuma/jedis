@@ -91,12 +91,29 @@ public class Server {
 		}
 	}
 	
+	private String parseCommand(byte[] data){
+		int length = data == null ? 0 : data.length;
+		int i = 0;
+		while(i < length && Character.isWhitespace(data[i++]));
+		StringBuilder stringBuilder = new StringBuilder();
+		while(i < length && Character.isWhitespace(data[i])) {
+			stringBuilder.append(data[i++]);
+		}
+		return stringBuilder.toString();
+	}
+	
+	private boolean isValidCommand(String command){
+		return command != null && 
+				command.length() > 0 && 
+				commandTable.containsKey(command);
+	}
+	
 	private byte[] processCommand(SocketChannel clientChannel,byte[] data){
-		String command = new String(data);
-		if(!commandTable.containsKey(command)) return "Unkonwn Command".getBytes();
+		String command = parseCommand(data);
+		if(!isValidCommand(command)) return "Unkonwn Command".getBytes();
 		String address = getRemoteAddress(clientChannel);
 		if(clientSockets.containsKey(address) && clients.containsKey(address)){
-			CommandHandler handler = commandTable.get(address);
+			CommandHandler handler = commandTable.get(command);
 			return handler.execute(databases,
 					clients.get(address),
 					new String(data)).getBytes();
