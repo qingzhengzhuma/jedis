@@ -8,10 +8,10 @@ public class GetHandler implements CommandHandler {
 	}
 
 	@Override
-	public JedisObject execute(JedisDB[] database, JedisClient client, String command) {
+	public JedisObject execute(JedisDB[] databases, JedisClient client, String command) {
 		// TODO Auto-generated method stub
 		String key = parseKey(command);
-		JedisDB db = database[client.currentDB];
+		JedisDB db = databases[client.currentDB];
 		return db.get(key);
 	}
 

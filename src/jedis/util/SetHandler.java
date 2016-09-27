@@ -16,10 +16,10 @@ public class SetHandler implements CommandHandler{
 	}
 	
 	@Override
-	public JedisObject execute(JedisDB[] database, JedisClient client,
+	public JedisObject execute(JedisDB[] databases, JedisClient client,
 			String command) throws UnsupportedOperationException{
 		// TODO Auto-generated method stub
-		JedisDB db = database[client.currentDB];
+		JedisDB db = databases[client.currentDB];
 		Entry entry = parseKeyAndValue(command);
 		if(db.containsKey(entry.key)){
 			JedisObject object = db.get(entry.key);
