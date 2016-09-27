@@ -12,31 +12,45 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import jedis.util.JedisDB;
+import jedis.util.CommandHandler;
+import jedis.util.JedisClient;
+
 public class Server {
 	
 	private Selector serverSelector;
-	private Map<Client,SocketChannel> clients = new HashMap<>();
+	private Map<String,SocketChannel> clientSockets;
+	private Map<String, JedisClient> clients;
+	private Map<String, CommandHandler> commandTable;
 	private ServerSocketChannel serverSocketChannel;
-	private final int LISTEN_PORT;
+	private int LISTEN_PORT = 8081;
 	private boolean isStop = false;
-	
+	private int databaseNum = 16;
+	private JedisDB[] databases;
 	public Server(){
-		LISTEN_PORT = getListenPort();
+		
 	}
 	
-	private int getListenPort(){
+	private int loadConfigration(){
 		int port = 8081;
 		return port;
 	}
 	
 	public boolean init(){
 		try {
+			loadConfigration();
+			databases = new JedisDB[databaseNum];
+			clientSockets = new HashMap<>();
+			commandTable = new HashMap<>();
 			serverSelector = Selector.open();
 			serverSocketChannel = ServerSocketChannel.open();
 			serverSocketChannel.socket().bind(new InetSocketAddress(LISTEN_PORT));
 			serverSocketChannel.configureBlocking(false);
 			serverSocketChannel.register(serverSelector, SelectionKey.OP_ACCEPT);
 		} catch (IOException e) {
+			System.exit(-1);
+		}catch (Exception e) {
+			// TODO: handle exception
 			System.exit(-1);
 		}
 		return true;
@@ -45,7 +59,8 @@ public class Server {
 	private void removeClient(SocketChannel clientChannel){
 		try {
 			String address = clientChannel.getRemoteAddress().toString();
-			clients.remove(new Client(address));
+			clientSockets.remove(address);
+			clients.remove(address);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -57,30 +72,46 @@ public class Server {
 			SocketChannel socketChannel = server.accept();
 			socketChannel.configureBlocking(false);
 			socketChannel.register(serverSelector,SelectionKey.OP_READ);
-			String address = socketChannel.getRemoteAddress().toString();
-			clients.put(new Client(address),socketChannel);
+			String address = getRemoteAddress(socketChannel);
+			clientSockets.put(address,socketChannel);
+			clients.put(address, new JedisClient(address));
 			System.out.println("Received Connection From " + address);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 	
-	private byte[] processCommand(SocketChannel clientChannel,byte[] data){
-		return "message received".getBytes();
+	private String getRemoteAddress(SocketChannel socketChannel){
+		try {
+			return socketChannel.getRemoteAddress().toString();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return new String();
+		}
 	}
 	
-	private boolean sendResponse(SocketChannel clientChannel,
-			ByteBuffer responseBuffer,byte[] result){
-		int length = result.length;
-		if(responseBuffer == null || length > responseBuffer.capacity()){
-			responseBuffer = ByteBuffer.allocate(length);
-		}else{
-			responseBuffer.clear();
+	private byte[] processCommand(SocketChannel clientChannel,byte[] data){
+		String command = new String(data);
+		if(!commandTable.containsKey(command)) return "Unkonwn Command".getBytes();
+		String address = getRemoteAddress(clientChannel);
+		if(clientSockets.containsKey(address) && clients.containsKey(address)){
+			CommandHandler handler = commandTable.get(address);
+			return handler.execute(databases,
+					clients.get(address),
+					new String(data)).getBytes();
 		}
-		responseBuffer.put(result);
-		while(responseBuffer.hasRemaining()){
+		return new byte[0];
+	}
+	
+	private boolean sendResponse(SocketChannel clientChannel,byte[] result){
+		int length = result.length;
+		ByteBuffer buffer = ByteBuffer.allocate(length);
+		buffer.put(result);
+		buffer.flip();
+		while(buffer.hasRemaining()){
 			try {
-				clientChannel.write(responseBuffer);
+				clientChannel.write(buffer);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -100,7 +131,8 @@ public class Server {
 			}else{
 				buffer.flip();
 				byte[] result = processCommand(clientChannel, buffer.array());
-				sendResponse(clientChannel, buffer, result);
+				System.out.println(new String(result));
+				sendResponse(clientChannel,result);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -135,30 +167,4 @@ public class Server {
 		server.init();
 		server.run();
 	}
-	
-	class Client{
-		private String address;
-		public Client(String address) {
-			this.address = address;
-		}
-		
-		@Override
-		public boolean equals(Object o){
-			if(o == this) return true;
-			if(!(o instanceof Client)) return false;
-			Client client = (Client)o;
-			return client.address.equals(this.address);
-		}
-		
-		@Override
-		public int hashCode(){
-			return this.address.hashCode();
-		}
-		
-		@Override
-		public String toString(){
-			return this.address;
-		}
-	}
-
 }
