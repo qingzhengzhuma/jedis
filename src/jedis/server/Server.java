@@ -12,14 +12,14 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import javax.security.auth.login.Configuration;
+
+import jedis.util.CommandConfigration;
 import jedis.util.CommandHandler;
 import jedis.util.CommandLine;
-import jedis.util.GetHandler;
+import jedis.util.CommandRule;
 import jedis.util.JedisClient;
 import jedis.util.JedisDB;
-import jedis.util.PingHandler;
-import jedis.util.SelectHandler;
-import jedis.util.SetHandler;
 
 public class Server {
 	private Selector serverSelector;
@@ -33,10 +33,6 @@ public class Server {
 	private int databaseNum = 16;
 	private JedisDB[] databases;
 
-	private CommandEntry[] supportedCommandDict = { new CommandEntry("ping", new PingHandler()),
-			new CommandEntry("select", new SelectHandler()), new CommandEntry("get", new GetHandler()),
-			new CommandEntry("set", new SetHandler()) };
-
 	public Server() {
 
 	}
@@ -47,8 +43,8 @@ public class Server {
 
 	private void initCommandTable() {
 		commandTable = new HashMap<>();
-		for (CommandEntry ce : supportedCommandDict) {
-			commandTable.put(ce.command, ce.handler);
+		for (CommandRule ce : CommandConfigration.getCommandRules()) {
+			commandTable.put(ce.getCommand(), ce.getHandler());
 		}
 	}
 
@@ -111,23 +107,22 @@ public class Server {
 		}
 	}
 
-	private boolean isValidCommand(String command) {
-		return commandTable.containsKey(command);
-	}
-
 	private byte[] processCommand(SocketChannel clientChannel, byte[] data) {
-		if (CommandLine.parse(data)) {
-			String command = CommandLine.getCommand();
-			if (isValidCommand(command) == false)
-				return "Unkonwn Command".getBytes();
-			String address = getRemoteAddress(clientChannel);
-			try {
-				CommandHandler handler = commandTable.get(command);
-				byte[] result = handler.execute(databases, clients.get(address), new String(data)).getBytes();
-				return result;
-			} catch (UnsupportedOperationException e) {
-				// TODO: handle exception
-				return "Not Supported Operation".getBytes();
+		if(CommandLine.parse(data)){
+			String command = CommandLine.getCommand().toLowerCase();
+			int argc = CommandLine.getArgc();
+			if(CommandConfigration.verifyCommand(command,argc) == true){
+				command = CommandLine.getNormalizedCmdLine();
+				String address = getRemoteAddress(clientChannel);
+				try {
+					CommandHandler handler = commandTable.get(command);
+					byte[] result = handler.execute(databases, clients.get(address),
+							new String(data)).getBytes();
+					return result;
+				} catch (UnsupportedOperationException e) {
+					// TODO: handle exception
+					return "Not Supported Operation By This Type".getBytes();
+				}
 			}
 		}
 		return "ILLIGAL COMMAND".getBytes();
