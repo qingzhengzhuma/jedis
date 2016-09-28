@@ -12,14 +12,14 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
-import javax.security.auth.login.Configuration;
-
 import jedis.util.CommandConfigration;
 import jedis.util.CommandHandler;
 import jedis.util.CommandLine;
 import jedis.util.CommandRule;
 import jedis.util.JedisClient;
 import jedis.util.JedisDB;
+import jedis.util.JedisObject;
+import jedis.util.Sds;
 
 public class Server {
 	private Selector serverSelector;
@@ -72,11 +72,18 @@ public class Server {
 		return true;
 	}
 
-	private void removeClient(SocketChannel clientChannel) {
+	private void removeClient(SelectionKey key) {
+		if(key == null) return;
+		key.cancel();
 		try {
-			String address = clientChannel.getRemoteAddress().toString();
-			clientSockets.remove(address);
-			clients.remove(address);
+			SocketChannel clientChannel = (SocketChannel) key.channel();
+			if(clientChannel != null){
+				String address = clientChannel.getRemoteAddress().toString();
+				clientSockets.remove(address);
+				clients.remove(address);
+				clientChannel.close();
+				System.out.println(address + "disconnected");
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -86,12 +93,17 @@ public class Server {
 		ServerSocketChannel server = (ServerSocketChannel) key.channel();
 		try {
 			SocketChannel socketChannel = server.accept();
-			socketChannel.configureBlocking(false);
-			socketChannel.register(serverSelector, SelectionKey.OP_READ);
-			String address = getRemoteAddress(socketChannel);
-			clientSockets.put(address, socketChannel);
-			clients.put(address, new JedisClient(address));
-			System.out.println("Received Connection From " + address);
+			if(socketChannel != null){
+				socketChannel.configureBlocking(false);
+				socketChannel.register(serverSelector, SelectionKey.OP_READ);
+				String address = getRemoteAddress(socketChannel);
+				clientSockets.put(address, socketChannel);
+				clients.put(address, new JedisClient(address));
+				System.out.println("Received Connection From " + address);
+			}else{
+				System.out.println("Connection receive, but failed to Connect.");
+			}
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -108,20 +120,27 @@ public class Server {
 	}
 
 	private byte[] processCommand(SocketChannel clientChannel, byte[] data) {
-		if(CommandLine.parse(data)){
+		if(CommandLine.parse(new String(data))){
 			String command = CommandLine.getCommand().toLowerCase();
 			int argc = CommandLine.getArgc();
 			if(CommandConfigration.verifyCommand(command,argc) == true){
-				command = CommandLine.getNormalizedCmdLine();
+				String commandLine = CommandLine.getNormalizedCmdLine();
 				String address = getRemoteAddress(clientChannel);
 				try {
 					CommandHandler handler = commandTable.get(command);
-					byte[] result = handler.execute(databases, clients.get(address),
-							new String(data)).getBytes();
+					JedisObject object = handler.execute(databases, clients.get(address),
+							commandLine);
+					if(object == null){
+						object = new Sds(("nil"));
+					}
+					byte[] result = object.getBytes();
 					return result;
 				} catch (UnsupportedOperationException e) {
 					// TODO: handle exception
 					return "Not Supported Operation By This Type".getBytes();
+				}catch (IllegalArgumentException e) {
+					// TODO: handle exception
+					return "Illegal Arguement".getBytes();
 				}
 			}
 		}
@@ -138,7 +157,7 @@ public class Server {
 				clientChannel.write(buffer);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
-				e.printStackTrace();
+				System.out.println(e.getMessage());
 				return false;
 			}
 		}
@@ -151,11 +170,13 @@ public class Server {
 		try {
 			int size = clientChannel.read(buffer);
 			if (size == -1) {
-				removeClient(clientChannel);
+				removeClient(key);
 			} else {
 				buffer.flip();
 				byte[] result = processCommand(clientChannel, buffer.array());
-				sendResponse(clientChannel, result);
+				if(sendResponse(clientChannel, result) == false){
+					removeClient(key);
+				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();

@@ -90,6 +90,8 @@ public class JedisWorkbench {
 						}
 						readBuffer.flip();
 						System.out.println(new String(readBuffer.array()));
+					}else if(command.equals("exit")){
+						clientSocket.close();
 					}else{
 						System.out.println("ILLIGAL COMMAND");
 					}
