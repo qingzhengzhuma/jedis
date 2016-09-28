@@ -6,19 +6,16 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Scanner;
 
+import jedis.util.CommandConfigration;
 import jedis.util.CommandLine;
+import jedis.util.CommandRule;
 
 public class JedisWorkbench {
 	private SocketChannel clientSocket;
 	private String serverIP;
 	private int serverPort;
 	
-	private CommandRule[] commandRules = {
-		new CommandRule("ping", 0, 0),
-		new CommandRule("select", 1, 1),
-		new CommandRule("set", 2, 2),
-		new CommandRule("get", 1, 1)
-	};
+	
 	
 	private void init(){
 		this.serverIP = "127.0.0.1";
@@ -28,16 +25,6 @@ public class JedisWorkbench {
 				System.out.println();
 			}
 		});
-	}
-	
-	/**
-	 * preprecess the command line user input,such trim the space
-	 * @param originalCommand
-	 * @return 
-	 */
-	private String prepareCommand(String originalCommand){
-		String preparedCommand = originalCommand == null ? new String() : originalCommand.trim();
-		return preparedCommand;
 	}
 	
 	private boolean writeCommandLengthToBuffer(ByteBuffer buffer,int length){
@@ -66,15 +53,6 @@ public class JedisWorkbench {
 		return buffer;
 	}
 	
-	private boolean verifyCommand(String command,int argc){
-		for(CommandRule rule : commandRules){
-			if(command.equals(rule.command) && 
-					argc >= rule.minArgc && 
-					argc <= rule.maxArgc) return true;
-		}
-		return false;
-	}
-	
 	public boolean connect(){
 		init();
 		try {
@@ -99,7 +77,7 @@ public class JedisWorkbench {
 				if(CommandLine.parse(line)){
 					String command = CommandLine.getCommand().toLowerCase();
 					int argc = CommandLine.getArgc();
-					if(verifyCommand(command,argc) == true){
+					if(CommandConfigration.verifyCommand(command,argc) == true){
 						command = CommandLine.getNormalizedCmdLine();
 						ByteBuffer buffer = wrapCommandToBuffer(command);
 						while(buffer.hasRemaining()){
@@ -129,17 +107,5 @@ public class JedisWorkbench {
 		JedisWorkbench client = new JedisWorkbench();
 		client.connect();
 		client.start();
-	}
-	
-	class CommandRule{
-		String command;
-		int minArgc;
-		int maxArgc;
-		public CommandRule(String command,int minArgc,int maxArgc) {
-			// TODO Auto-generated constructor stub
-			this.command = command;
-			this.minArgc = minArgc;
-			this.maxArgc = maxArgc;
-		}
 	}
 }
