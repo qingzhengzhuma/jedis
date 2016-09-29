@@ -1,10 +1,10 @@
 package jedis.util;
 
 import java.io.IOException;
-import java.nio.channels.FileChannel;
+import java.io.RandomAccessFile;
 
 public interface JedisObject {
 	public byte[] getBytes();
 	public JedisObject type();
-	public void writeObject(FileChannel channel) throws IOException;
+	public void writeObject(RandomAccessFile file) throws IOException;
 }
