@@ -6,59 +6,50 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Scanner;
 
-import jedis.util.CommandConfigration;
+import jedis.util.JedisConfigration;
 import jedis.util.CommandLine;
-import jedis.util.CommandRule;
+import jedis.util.MessageConstant;
 
 public class JedisWorkbench {
 	private SocketChannel clientSocket;
 	private String serverIP;
 	private int serverPort;
-	
-	
-	
-	private void init(){
+
+	private void init() {
 		this.serverIP = "127.0.0.1";
 		this.serverPort = 8081;
-		Runtime.getRuntime().addShutdownHook(new Thread(){
+		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
 				System.out.println();
 			}
 		});
 	}
-	
-	private boolean writeCommandLengthToBuffer(ByteBuffer buffer,int length){
-		buffer.put((byte)(length | (255<<24)));
-		buffer.put((byte)(length | (255<<16)));
-		buffer.put((byte)(length | (255<<8)));
-		buffer.put((byte)(length | 255));
-		return true;
-	}
-	
-	private boolean writeCommandToBuffer(ByteBuffer buffer,String command){
+
+	private boolean writeCommandToBuffer(ByteBuffer buffer, String command) {
 		int length = command.length();
-		for(int i = 0; i < length;++i){
-			buffer.put((byte)command.charAt(i));
+		for (int i = 0; i < length; ++i) {
+			buffer.put((byte) command.charAt(i));
 		}
 		return true;
 	}
-	
-	private ByteBuffer wrapCommandToBuffer(String command){
-		if(command == null || command.length() == 0) return ByteBuffer.allocate(0);
-	    int length = command.length();
-	    ByteBuffer buffer = ByteBuffer.allocate(length + 4);
-	    //writeCommandLengthToBuffer(buffer, length);
-	    writeCommandToBuffer(buffer, command);
-	    buffer.flip();
+
+	private ByteBuffer wrapCommandToBuffer(String command) {
+		if (command == null || command.length() == 0)
+			return ByteBuffer.allocate(0);
+		int length = command.length();
+		ByteBuffer buffer = ByteBuffer.allocate(length + 4);
+		// writeCommandLengthToBuffer(buffer, length);
+		writeCommandToBuffer(buffer, command);
+		buffer.flip();
 		return buffer;
 	}
-	
-	public boolean connect(){
+
+	public boolean connect() {
 		init();
 		try {
 			clientSocket = SocketChannel.open();
 			clientSocket.configureBlocking(true);
-			clientSocket.connect(new InetSocketAddress(this.serverIP,this.serverPort));
+			clientSocket.connect(new InetSocketAddress(this.serverIP, this.serverPort));
 			clientSocket.finishConnect();
 		} catch (IOException e) {
 			System.out.println("Failed to connect to server");
@@ -66,34 +57,37 @@ public class JedisWorkbench {
 		}
 		return true;
 	}
-	
-	public void start(){
+
+	public void start() {
 		String promptSymbol = this.serverIP + ":" + this.serverPort + ">";
 		Scanner scanner = new Scanner(System.in);
 		System.out.print(promptSymbol);
 		try {
-			while(scanner.hasNext()){
+			while (scanner.hasNext()) {
 				String line = scanner.nextLine();
-				if(CommandLine.parse(line)){
-					String command = CommandLine.getCommand().toLowerCase();
-					int argc = CommandLine.getArgc();
-					if(CommandConfigration.verifyCommand(command,argc) == true){
-						command = CommandLine.getNormalizedCmdLine();
+				CommandLine cl = new CommandLine();
+				if (cl.parse(line)) {
+					String command = cl.getNormalizedCmd();
+					int argc = cl.getArgc();
+					if (JedisConfigration.verifyCommand(command, argc) == true) {
+						command = cl.getNormalizedCmdLine();
 						ByteBuffer buffer = wrapCommandToBuffer(command);
-						while(buffer.hasRemaining()){
+						while (buffer.hasRemaining()) {
 							clientSocket.write(buffer);
 						}
 						ByteBuffer readBuffer = ByteBuffer.allocate(1024);
-						if(clientSocket.read(readBuffer) == -1){
-							System.out.println("Disconnected...");
+						if (clientSocket.read(readBuffer) == -1) {
+							System.out.println(MessageConstant.CONNECTION_CLOSED);
 							System.exit(-1);
 						}
 						readBuffer.flip();
 						System.out.println(new String(readBuffer.array()));
-					}else if(command.equals("exit")){
+					} else if (command.equals("quit") || command.equals("exit")) {
 						clientSocket.close();
-					}else{
-						System.out.println("ILLIGAL COMMAND");
+						System.out.println(MessageConstant.BYE);
+						break;
+					} else {
+						System.out.println(MessageConstant.ILLEGAL_COMMAND);
 					}
 				}
 				System.out.print(promptSymbol);
@@ -101,13 +95,51 @@ public class JedisWorkbench {
 			scanner.close();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
-			System.out.println("Bye");
+			System.out.println(MessageConstant.BYE);
 		}
 	}
-	
-	public static void main(String[] args){
+
+	public void fakeClientStart(int testCount) {
+		String cmd = "set";
+		for (int i = 1; i <= testCount; ++i) {
+			String key = Integer.toString(i);
+			String value = Integer.toString(i + 1);
+			String line = cmd + " " + key + " " + value;
+			CommandLine cl = new CommandLine();
+			if (cl.parse(line)) {
+				String command = cl.getNormalizedCmd();
+				int argc = cl.getArgc();
+				try {
+					JedisConfigration.verifyCommand(command, argc);
+					command = cl.getNormalizedCmdLine();
+					ByteBuffer buffer = wrapCommandToBuffer(command);
+					while (buffer.hasRemaining()) {
+						clientSocket.write(buffer);
+					}
+					ByteBuffer readBuffer = ByteBuffer.allocate(1024);
+					if (clientSocket.read(readBuffer) == -1) {
+						System.out.println(MessageConstant.CONNECTION_CLOSED);
+						System.exit(-1);
+					}
+					readBuffer.flip();
+					// System.out.println(new String(readBuffer.array()));
+				} catch (IOException e) {
+					// TODO: handle exception
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+
+	public static void main(String[] args) {
 		JedisWorkbench client = new JedisWorkbench();
 		client.connect();
+		//int testCount = 10000000;
+		//long t0 = System.currentTimeMillis();
+		//client.fakeClientStart(testCount);
+		//long t1 = System.currentTimeMillis();
+		//System.out.println(Long.toString((t1 - t0)));
 		client.start();
+		//System.out.println("Done");
 	}
 }
