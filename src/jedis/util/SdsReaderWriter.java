@@ -1,37 +1,25 @@
 package jedis.util;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.rmi.UnexpectedException;
+import java.io.RandomAccessFile;
 
 public class SdsReaderWriter implements JedisObjectReaderWriter {
 
 	@Override
-	public JedisObject readObject(FileChannel channel) 
+	public JedisObject readObject(RandomAccessFile file) 
 			throws IOException {
 		// TODO Auto-generated method stub
-		ByteBuffer buffer = ByteBuffer.allocate(4);
-		channel.read(buffer);
-		buffer.flip();
-		int length = buffer.getInt();
-		buffer = ByteBuffer.allocate(length);
-		int left = length;
-		while(left != 0){
-			int size = channel.read(buffer);
-			if(size == -1){
-				throw new UnexpectedException("Unexpected End of File");
-			}
-			left -= size;
-		}
-		buffer.flip();
-		return new Sds(buffer.array());
+		int length = file.readInt();
+		byte[] buf = new byte[length];
+		//System.out.println(length);
+		file.read(buf);
+		return new Sds(buf);
 	}
 	
 	@Override
-	public void writeObject(FileChannel channel,
+	public void writeObject(RandomAccessFile file,
 			JedisObject object) throws IOException{
-		object.writeObject(channel);
+		object.writeObject(file);
 	}
 
 }
