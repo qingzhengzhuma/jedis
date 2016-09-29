@@ -20,6 +20,7 @@ import jedis.util.JedisClient;
 import jedis.util.JedisDB;
 import jedis.util.JedisObject;
 import jedis.util.MessageConstant;
+import jedis.util.RdbSaveThread;
 import jedis.util.Sds;
 
 public class Server {
@@ -31,8 +32,9 @@ public class Server {
 
 	private int LISTEN_PORT = 8081;
 	private boolean isStop = false;
-	private int databaseNum = 16;
-	private JedisDB[] databases;
+	private static int databaseNum = 16;
+	public static JedisDB[] databases;
+	public static RdbSaveThread rdbSaveThread;
 
 	public Server() {
 
