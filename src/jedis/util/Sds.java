@@ -1,30 +1,36 @@
 package jedis.util;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+
 public class Sds implements JedisObject{
+	private static JedisObject TYPE = new Sds("STRING");
+	private static final byte typeCode = (byte)0; 
 	private int used;
 	private int free;
-	private char[] content;
+	private byte[] content;
 	public Sds() {
 		// TODO Auto-generated constructor stub
 		this.used = 0;
 		this.free = 0;
-		content = new char[0];
+		content = new byte[0];
 	}
 	
 	public Sds(int initLength){
 		this.used = 0;
 		this.free = initLength;
-		this.content = new char[initLength];
+		this.content = new byte[initLength];
 	}
 	
-	public Sds(char[] init){
+	public Sds(byte[] init){
 		int length = init == null ? 0 : init.length;
 		this.used = length;
 		this.free = 0;
-		this.content = new char[length];
+		this.content = new byte[length];
 		int i = 0;
-		for(char c : init){
-			this.content[i++] = c;
+		for(byte b : init){
+			this.content[i++] = b;
 		}
 	}
 	
@@ -32,9 +38,9 @@ public class Sds implements JedisObject{
 		int length = init == null ? 0 : init.length();
 		this.used = length;
 		this.free = 0;
-		this.content = new char[length];
+		this.content = new byte[length];
 		for(int i = 0; i < length; ++i){
-			this.content[i] = init.charAt(i);
+			this.content[i] = (byte)init.charAt(i);
 		}
 	}
 	
@@ -79,7 +85,7 @@ public class Sds implements JedisObject{
 	
 	public int resize(int capacity){
 		if(capacity > this.used) {
-			char[] newContent = new char[capacity];
+			byte[] newContent = new byte[capacity];
 			for(int i = 0; i < this.used;++i){
 				newContent[i] = this.content[i];
 			}
@@ -89,14 +95,14 @@ public class Sds implements JedisObject{
 		return this.content.length;
 	}
 	
-	public void copyFrom(char[] s,int length){
+	public void copyFrom(byte[] s,int length){
 		if(length < 0){
 			throw new IllegalArgumentException();
 		}
 		if(s == null) length = 0;
 		if(s.length < length) length = s.length;
 		if(this.content.length < length){
-			this.content = new char[length];	
+			this.content = new byte[length];	
 		}
 		for(int i = 0; i < length;++i){
 			content[i] = s[i];
@@ -105,7 +111,7 @@ public class Sds implements JedisObject{
 		this.free = this.content.length - this.used;
 	}
 	
-	public void copyFrom(char[] s) {
+	public void copyFrom(byte[] s) {
 		copyFrom(s,s == null ? 0 : s.length);
 	}
 	
@@ -117,7 +123,7 @@ public class Sds implements JedisObject{
 		copyFrom(s.content,s == null ? 0 : s.getLength());
 	}
 	
-	public void append(char[] s,int length) {
+	public void append(byte[] s,int length) {
 		if(s == null || s.length == 0) length = 0;
 		if(length > s.length) length = s.length;
 		if(this.free >= length){
@@ -127,7 +133,7 @@ public class Sds implements JedisObject{
 			}
 			this.free -= length;
 		}else{
-			char[] newContent = new char[this.used + s.length];
+			byte[] newContent = new byte[this.used + s.length];
 			int i = 0;
 			for(; i < this.used;++i){
 				newContent[i] = this.content[i];
@@ -141,11 +147,39 @@ public class Sds implements JedisObject{
 		this.used += length;
 	}
 	
+	public void append(String s,int length) {
+		if(s == null || s.length() == 0) length = 0;
+		if(length > s.length()) length = s.length();
+		if(this.free >= length){
+			int i = this.used;
+			for(int j = 0; j < length;++j){
+				this.content[i++] = (byte)s.charAt(j);
+			}
+			this.free -= length;
+		}else{
+			byte[] newContent = new byte[this.used + length];
+			int i = 0;
+			for(; i < this.used;++i){
+				newContent[i] = this.content[i];
+			}
+			for(int j = 0; j < length; ++j){
+				newContent[i++] = (byte)s.charAt(j);
+			}
+			this.content = newContent;
+			this.free = 0;
+		}
+		this.used += length;
+	}
+	
+	public void append(String s) {
+		append(s,s.length());
+	}
+	
 	public void append(Sds s,int length) {
 		append(s.content, length);
 	}
 	
-	public void append(char[] s) {
+	public void append(byte[] s) {
 		append(s, s == null ? 0 : s.length);
 	}
 	
@@ -153,15 +187,29 @@ public class Sds implements JedisObject{
 		append(s,s == null ? 0 :s.getLength());
 	}
 	
-	public static void main(String[] args) {
-		// TODO Auto-generated method stub
-
-	}
-
 	@Override
 	public byte[] getBytes() {
 		// TODO Auto-generated method stub
 		return toString().getBytes();
+	}
+	
+	@SuppressWarnings("static-access")
+	@Override 
+	public JedisObject type(){
+		return this.TYPE;
+	}
+
+	@Override
+	public void writeObject(FileChannel channel) throws IOException{
+		// TODO Auto-generated method stub
+		ByteBuffer buffer = ByteBuffer.allocate(used + 5);
+		buffer.put(typeCode);
+		buffer.putInt(used);
+		buffer.put(this.content,0,used);
+		buffer.flip();
+		while(buffer.hasRemaining()){
+			channel.write(buffer);
+		}
 	}
 
 }

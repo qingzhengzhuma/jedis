@@ -45,25 +45,25 @@ public class SdsTest {
 
 	@Test
 	public void testCopyFromCharArrayInt() {
-		sdss[0].copyFrom(strings[2].toCharArray(), 0);
+		sdss[0].copyFrom(strings[2].getBytes(), 0);
 		assertEquals(strings[2], sdss[0].toString());
-		sdss[0].copyFrom(strings[0].toCharArray(),0);
+		sdss[0].copyFrom(strings[0].getBytes(),0);
 		assertEquals(strings[2], sdss[0].toString());
-		sdss[0].copyFrom(strings[0].toCharArray(),2);
+		sdss[0].copyFrom(strings[0].getBytes(),2);
 		assertEquals(strings[0].substring(0, 2), sdss[0].toString());
-		sdss[0].copyFrom(strings[0].toCharArray(),strings[0].length());
+		sdss[0].copyFrom(strings[0].getBytes(),strings[0].length());
 		assertEquals(strings[0], sdss[0].toString());
 	}
 
 	@Test
 	public void testAppendCharArrayInt() {
-		sdss[0].append(strings[2].toCharArray(), 0);
+		sdss[0].append(strings[2].getBytes(), 0);
 		assertEquals(strings[0], sdss[0].toString());
-		sdss[0].append(strings[0].toCharArray(),0);
+		sdss[0].append(strings[0].getBytes(),0);
 		assertEquals(strings[0], sdss[0].toString());
-		sdss[0].append(strings[0].toCharArray(),2);
+		sdss[0].append(strings[0].getBytes(),2);
 		assertEquals(strings[0] + strings[0].substring(0, 2), sdss[0].toString());
-		sdss[0].append(strings[0].toCharArray(),strings[0].length());
+		sdss[0].append(strings[0].getBytes(),strings[0].length());
 		assertEquals(strings[0] + strings[0].substring(0, 2) + strings[0], sdss[0].toString());
 	}
 	
