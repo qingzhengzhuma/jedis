@@ -2,7 +2,8 @@ package jedis.util;
 
 public class JedisClient{
 	private String address;
-	int currentDB;
+	private int currentDB;
+	
 	public JedisClient(String address) {
 		this.currentDB = 0;
 		this.address = address;
@@ -32,5 +33,9 @@ public class JedisClient{
 	
 	public void setCurrentDB(int newDB){
 		this.currentDB = newDB;
+	}
+	
+	public int getCurrntDB(){
+		return this.currentDB;
 	}
 }
