@@ -1,12 +1,11 @@
 package jedis.util;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
+import java.io.RandomAccessFile;
 
 public class Sds implements JedisObject{
 	private static JedisObject TYPE = new Sds("STRING");
-	private static final byte typeCode = (byte)0; 
+	private static final byte typeCode = '0'; 
 	private int used;
 	private int free;
 	private byte[] content;
@@ -200,16 +199,11 @@ public class Sds implements JedisObject{
 	}
 
 	@Override
-	public void writeObject(FileChannel channel) throws IOException{
+	public void writeObject(RandomAccessFile file) throws IOException{
 		// TODO Auto-generated method stub
-		ByteBuffer buffer = ByteBuffer.allocate(used + 5);
-		buffer.put(typeCode);
-		buffer.putInt(used);
-		buffer.put(this.content,0,used);
-		buffer.flip();
-		while(buffer.hasRemaining()){
-			channel.write(buffer);
-		}
+		file.writeByte(typeCode);
+		file.writeInt(used);
+		file.write(content,0,used);
 	}
 
 }
