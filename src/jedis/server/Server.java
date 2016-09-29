@@ -12,13 +12,14 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
-import jedis.util.CommandConfigration;
+import jedis.util.JedisConfigration;
 import jedis.util.CommandHandler;
 import jedis.util.CommandLine;
 import jedis.util.CommandRule;
 import jedis.util.JedisClient;
 import jedis.util.JedisDB;
 import jedis.util.JedisObject;
+import jedis.util.MessageConstant;
 import jedis.util.Sds;
 
 public class Server {
@@ -43,7 +44,7 @@ public class Server {
 
 	private void initCommandTable() {
 		commandTable = new HashMap<>();
-		for (CommandRule ce : CommandConfigration.getCommandRules()) {
+		for (CommandRule ce : JedisConfigration.getCommandRules()) {
 			commandTable.put(ce.getCommand(), ce.getHandler());
 		}
 	}
@@ -82,7 +83,7 @@ public class Server {
 				clientSockets.remove(address);
 				clients.remove(address);
 				clientChannel.close();
-				System.out.println(address + "disconnected");
+				System.out.println(address + " " + MessageConstant.CONNECTION_CLOSED);;
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -120,16 +121,16 @@ public class Server {
 	}
 
 	private byte[] processCommand(SocketChannel clientChannel, byte[] data) {
-		if(CommandLine.parse(new String(data))){
-			String command = CommandLine.getCommand().toLowerCase();
-			int argc = CommandLine.getArgc();
-			if(CommandConfigration.verifyCommand(command,argc) == true){
-				String commandLine = CommandLine.getNormalizedCmdLine();
+		CommandLine cl = new CommandLine();
+		if(cl.parse(new String(data))){
+			String command = cl.getNormalizedCmd();
+			int argc = cl.getArgc();
+			if(JedisConfigration.verifyCommand(command,argc) == true){
 				String address = getRemoteAddress(clientChannel);
 				try {
 					CommandHandler handler = commandTable.get(command);
 					JedisObject object = handler.execute(databases, clients.get(address),
-							commandLine);
+							cl);
 					if(object == null){
 						object = new Sds(("nil"));
 					}
@@ -137,14 +138,14 @@ public class Server {
 					return result;
 				} catch (UnsupportedOperationException e) {
 					// TODO: handle exception
-					return "Not Supported Operation By This Type".getBytes();
+					return MessageConstant.NOT_SUPPORTED_OPERATION.getBytes();
 				}catch (IllegalArgumentException e) {
 					// TODO: handle exception
-					return "Illegal Arguement".getBytes();
+					return MessageConstant.ILLEGAL_ARGUMENT.getBytes();
 				}
 			}
 		}
-		return "ILLIGAL COMMAND".getBytes();
+		return MessageConstant.ILLEGAL_COMMAND.getBytes();
 	}
 
 	private boolean sendResponse(SocketChannel clientChannel, byte[] result) {
