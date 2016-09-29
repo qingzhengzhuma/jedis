@@ -4,10 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CommandLine {
-	private static List<String> segs;
-	private static String normalizedCmdLine;
-	private static String normalizedCmd;
-	public static boolean parse(String cmdLine){
+	private List<String> segs;
+	private String normalizedCmdLine;
+	private  String normalizedCmd;
+	public boolean parse(String cmdLine){
 		segs = null;
 		normalizedCmdLine = null;
 		normalizedCmd = null;
@@ -31,7 +31,7 @@ public class CommandLine {
 		return true;
 	}
 	
-	public static boolean parse(byte[] cmdLine){
+	public  boolean parse(byte[] cmdLine){
 		segs = null;
 		normalizedCmdLine = null;
 		normalizedCmd = null;
@@ -60,15 +60,15 @@ public class CommandLine {
 		}
 		return true;
 	}
-	public static int getArgc(){
+	public int getArgc(){
 		return segs.size() - 1;
 	}
 	
-	public static String getCommand() {
+	public String getCommand() {
 		return segs.get(0);
 	}
 	
-	public static String getNormalizedCmdLine(){
+	public String getNormalizedCmdLine(){
 		if(normalizedCmdLine == null){
 			normalizedCmdLine = segs.get(0).toLowerCase();
 			for(int i = 1; i < segs.size();++i){
@@ -78,10 +78,14 @@ public class CommandLine {
 		return normalizedCmdLine;
 	}
 	
-	public static String getNormalizedCmd(){
+	public String getNormalizedCmd(){
 		if(normalizedCmd == null){
 			normalizedCmd = segs.get(0).toLowerCase();
 		}
 		return normalizedCmd;
+	}
+	
+	public String getArg(int index){
+		return segs.get(index + 1);
 	}
 }
