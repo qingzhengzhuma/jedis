@@ -14,6 +14,7 @@ public final class MessageConstant {
 	public static final JedisObject NO_SUCH_KEY = new Sds("No Such Key");
 	public static final JedisObject BYE = new Sds("Bye");
 	public static final JedisObject CONNECTION_CLOSED = new Sds("Connection Closed");
+	public static final JedisObject AOF_BUSY = new Sds("AOF Serlization Is Running");
 	public static final JedisObject[] NUMBERS;
 	static{
 		NUMBERS = new Sds[NUMBER_COUNT];
