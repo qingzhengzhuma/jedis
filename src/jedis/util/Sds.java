@@ -205,5 +205,22 @@ public class Sds implements JedisObject{
 		file.writeInt(used);
 		file.write(content,0,used);
 	}
+	
+	@Override
+	public Sds deepClone(){
+		Sds sds = new Sds(this.used);;
+		sds.copyFrom(this);
+		return sds;
+	}
+	
+	@Override
+	public String insertCommand(Sds key){
+		Sds sds = new Sds(key.used + used + 5);
+		sds.append("set ");
+		sds.append(key);
+		sds.append(" ");
+		sds.append(this);
+		return sds.toString();
+	}
 
 }
