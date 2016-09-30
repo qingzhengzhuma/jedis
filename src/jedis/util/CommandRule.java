@@ -1,10 +1,12 @@
 package jedis.util;
 
+import jedis.server.CommandHandler;
+
 public class CommandRule{
 	private final String command;
 	private final int minArgc;
 	private final int maxArgc;
-	CommandHandler handler;
+	private CommandHandler handler;
 	public CommandRule(String command,int minArgc,int maxArgc,CommandHandler handler) {
 		// TODO Auto-generated constructor stub
 		this.command = command;
@@ -27,6 +29,5 @@ public class CommandRule{
 	
 	public CommandHandler getHandler() {
 		return this.handler;
-		
 	}
 }
