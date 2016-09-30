@@ -1,6 +1,16 @@
 package jedis.util;
 
-import jedis.util.CommandRule;
+import jedis.server.AppendHandler;
+import jedis.server.CommandHandler;
+import jedis.server.DeleteHandle;
+import jedis.server.ExistsHandler;
+import jedis.server.GetHandler;
+import jedis.server.JedisObjectReaderWriter;
+import jedis.server.PingHandler;
+import jedis.server.SaveHandler;
+import jedis.server.SdsReaderWriter;
+import jedis.server.SelectHandler;
+import jedis.server.SetHandler;
 
 public class JedisConfigration {
 	private static final CommandRule[] commandRules = {
@@ -10,11 +20,21 @@ public class JedisConfigration {
 			new CommandRule("get", 1, 1,new GetHandler()),
 			new CommandRule("exists", 1, 1, new ExistsHandler()),
 			new CommandRule("append", 2, 2, new AppendHandler()),
-			new CommandRule("del", 1, Integer.MAX_VALUE, new DeleteHandle())
+			new CommandRule("del", 1, Integer.MAX_VALUE, new DeleteHandle()),
+			new CommandRule("save", 0, 0, new SaveHandler()),
 		};
 	
 	public static CommandRule[] getCommandRules(){
 		return commandRules;
+	}
+	
+	public static CommandHandler getHandler(String cmd){
+		for(CommandRule rule : commandRules){
+			if(rule.getCommand().equals(cmd)){
+				return rule.getHandler();
+			}
+		}
+		return null;
 	}
 	
 	public static boolean verifyCommand(String command,int argc){
@@ -34,6 +54,6 @@ public class JedisConfigration {
 	}
 	
 	public static final String workPath = "/home/liaojian/workspace/";
-	public static final String rdbFileName = "jedis.rdb";
-	public static final String aofFileName = "jedis.aof";
+	public static final String rdbPathName = workPath + "jedis.rdb";
+	public static final String aofPathName = workPath + "jedis.aof";
 }
