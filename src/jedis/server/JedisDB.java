@@ -6,7 +6,7 @@ import java.util.Map;
 import jedis.util.JedisObject;
 import jedis.util.Sds;
 
-public class JedisDB {
+public class JedisDB{
 	private Map<Sds, JedisObject> dict;
 	
 	public JedisDB(){
@@ -25,11 +25,19 @@ public class JedisDB {
 		dict.put(key, value);
 	}
 	
-	public boolean remove(String key) {
+	public boolean remove(Sds key) {
 		return dict.remove(key) != null;
 	}
 	
 	Map<Sds, JedisObject> getDict(){
 		return dict;
+	}
+	
+	public JedisDB copy(){
+		JedisDB db = new JedisDB();
+		for(Sds key : this.dict.keySet()){
+			db.dict.put((Sds)key.deepClone(),this.dict.get(key).deepClone());
+		}
+		return db;
 	}
 }
