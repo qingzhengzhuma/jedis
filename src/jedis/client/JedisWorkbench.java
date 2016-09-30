@@ -99,47 +99,9 @@ public class JedisWorkbench {
 		}
 	}
 
-	public void fakeClientStart(int testCount) {
-		String cmd = "set";
-		for (int i = 1; i <= testCount; ++i) {
-			String key = Integer.toString(i);
-			String value = Integer.toString(i + 1);
-			String line = cmd + " " + key + " " + value;
-			CommandLine cl = new CommandLine();
-			if (cl.parse(line)) {
-				String command = cl.getNormalizedCmd();
-				int argc = cl.getArgc();
-				try {
-					JedisConfigration.verifyCommand(command, argc);
-					command = cl.getNormalizedCmdLine();
-					ByteBuffer buffer = wrapCommandToBuffer(command);
-					while (buffer.hasRemaining()) {
-						clientSocket.write(buffer);
-					}
-					ByteBuffer readBuffer = ByteBuffer.allocate(1024);
-					if (clientSocket.read(readBuffer) == -1) {
-						System.out.println(MessageConstant.CONNECTION_CLOSED);
-						System.exit(-1);
-					}
-					readBuffer.flip();
-					// System.out.println(new String(readBuffer.array()));
-				} catch (IOException e) {
-					// TODO: handle exception
-					e.printStackTrace();
-				}
-			}
-		}
-	}
-
 	public static void main(String[] args) {
 		JedisWorkbench client = new JedisWorkbench();
 		client.connect();
-		//int testCount = 10000000;
-		//long t0 = System.currentTimeMillis();
-		//client.fakeClientStart(testCount);
-		//long t1 = System.currentTimeMillis();
-		//System.out.println(Long.toString((t1 - t0)));
 		client.start();
-		//System.out.println("Done");
 	}
 }
