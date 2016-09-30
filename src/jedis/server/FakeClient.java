@@ -72,13 +72,23 @@ public class FakeClient {
 		return true;
 	}
 
-	public boolean recoverFromAof(String aofPathname) throws IOException {
+	public boolean sendCommandInAof(String aofPathname) throws IOException {
 		AOF aof = AOF.openForRead(aofPathname);
 		String line;
 		while ((line = aof.next()) != null) {
 			sendCommand(line);
 		}
+		aof.close();
 		return true;
+	}
+	
+	public void disconnect(){
+		try {
+			clientSocket.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	public boolean recoverFromRdb(String rdbPathName) {
