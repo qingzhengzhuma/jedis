@@ -6,17 +6,18 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import jedis.util.JedisConfigration;
-import jedis.util.JedisDB;
+import jedis.server.JedisDB;
 import jedis.util.JedisObject;
-import jedis.util.RdbLoader;
-import jedis.util.RdbSaveThread;
+import jedis.server.RDB;
+import jedis.server.RdbSaveThread;
+import jedis.server.Server;
 import jedis.util.Sds;
 
 public class rdbReadWriteTest {
@@ -44,7 +45,8 @@ public class rdbReadWriteTest {
 			RdbSaveThread thread = new RdbSaveThread(databases);
 			thread.start();
 			thread.join();
-			JedisDB[] dbs = RdbLoader.load(JedisConfigration.workPath + JedisConfigration.rdbFileName);
+			RDB.load(JedisConfigration.rdbPathName);
+			JedisDB[] dbs = Server.inUseDatabases;
 			assertEquals(databases.length, dbs.length);
 			Class<?> dbClass = JedisDB.class;
 			try {
