@@ -2,6 +2,7 @@ package jedis.test;
 
 import static org.junit.Assert.assertEquals;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
@@ -16,9 +17,7 @@ public class ServerTest {
 	
 	@BeforeClass
 	public static void setUp(){
-		server = new Server();
-		server.init();
-		serverClass = server.getClass();
+		
 	}
 
 	@Test
@@ -35,6 +34,10 @@ public class ServerTest {
 					"  set".getBytes(),
 					"get  ".getBytes()
 			};
+			serverClass = Class.forName("jedis.server.Server");
+			Constructor<?> constructor = serverClass.getConstructor();
+			server = (Server)constructor.newInstance();
+			server.init();
 			Method isValidCommand = serverClass.getDeclaredMethod("isValidCommand", String.class);
 			isValidCommand.setAccessible(true);
 			Method parseCommand = serverClass.getDeclaredMethod("parseCommand", byte[].class);
@@ -55,6 +58,12 @@ public class ServerTest {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (InvocationTargetException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InstantiationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
