@@ -1,7 +1,6 @@
 package jedis.server;
 
 import jedis.util.CommandLine;
-import jedis.util.JedisClient;
 import jedis.util.JedisObject;
 import jedis.util.MessageConstant;
 
@@ -13,9 +12,8 @@ public class SelectHandler implements CommandHandler {
 		
 		try{
 			int dbIndex = Integer.parseInt(cl.getArg(0));
-			//once bufDatabase != null we should check bufDatabases for
-			//data in bufaDatabases is newer than that in databases
-			JedisDB[] databases = Server.bufDatabases != null ? Server.bufDatabases : Server.databases;
+			
+			JedisDB[] databases = Server.inUseDatabases;
 			if(databases == null || databases.length == 0 || 
 					dbIndex < 0 || dbIndex >= databases.length){
 				return MessageConstant.INDEX_OUT_OF_BOUNDARY;
