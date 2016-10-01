@@ -75,7 +75,6 @@ public class JedisWorkbench {
 			System.exit(-1);
 		}
 		try {
-			init();
 			clientSocket = SocketChannel.open();
 			clientSocket.configureBlocking(true);
 			clientSocket.connect(new InetSocketAddress(this.serverIP, this.serverPort));
