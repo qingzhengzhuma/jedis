@@ -1,16 +1,14 @@
 package jedis.server;
 
-import java.util.HashMap;
-import java.util.Map;
-
+import jedis.util.JedisMap;
 import jedis.util.JedisObject;
 import jedis.util.Sds;
 
 public class JedisDB{
-	private Map<Sds, JedisObject> dict;
+	private JedisMap<Sds, JedisObject> dict;
 	
 	public JedisDB(){
-		dict = new HashMap<>();
+		dict = new JedisMap<>();
 	}
 	
 	public boolean containsKey(Sds key){
@@ -29,15 +27,13 @@ public class JedisDB{
 		return dict.remove(key) != null;
 	}
 	
-	Map<Sds, JedisObject> getDict(){
+	JedisMap<Sds, JedisObject> getDict(){
 		return dict;
 	}
 	
 	public JedisDB copy(){
 		JedisDB db = new JedisDB();
-		for(Sds key : this.dict.keySet()){
-			db.dict.put((Sds)key.deepClone(),this.dict.get(key).deepClone());
-		}
+		db.dict = dict.copy();
 		return db;
 	}
 }

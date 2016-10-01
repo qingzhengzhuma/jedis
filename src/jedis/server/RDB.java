@@ -5,11 +5,13 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Date;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 
 import jedis.util.JedisConfigration;
+import jedis.util.JedisEntry;
 import jedis.util.JedisObject;
 import jedis.util.Sds;
 
@@ -50,9 +52,9 @@ public class RDB {
 			int dbIndex = 0;
 			for (JedisDB db : databases) {
 				file.writeInt(dbIndex++);
-				Set<Entry<Sds, JedisObject>> entries = db.getDict().entrySet();
+				List<JedisEntry<Sds, JedisObject>> entries = db.getDict().entryList();
 				file.writeInt(entries.size());
-				for (Entry<Sds, JedisObject> entry : entries) {
+				for (JedisEntry<Sds, JedisObject> entry : entries) {
 					JedisObject key = entry.getKey();
 					JedisObject value = entry.getValue();
 					try {

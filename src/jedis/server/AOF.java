@@ -89,7 +89,7 @@ public class AOF {
 		int dbNum = databases == null ? 0 : databases.length;
 		for (int i = 0; i < dbNum; ++i) {
 			if(databases[i] == null) continue;
-			for (Sds key : databases[i].getDict().keySet()) {
+			for (Sds key : databases[i].getDict().keyList()) {
 				JedisObject value = databases[i].get(key);
 				String insertCmd = value.insertCommand(key);
 				aFile.writeBytes(insertCmd);

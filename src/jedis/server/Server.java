@@ -1,7 +1,6 @@
 package jedis.server;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -15,7 +14,6 @@ import java.util.Map;
 import java.util.Set;
 
 import jedis.util.CommandLine;
-import jedis.util.CommandRule;
 import jedis.util.JedisConfigration;
 import jedis.util.JedisObject;
 import jedis.util.MessageConstant;
@@ -40,7 +38,7 @@ public class Server {
 	public static SyncPolicy syncPolicy;
 	private int hz = 10;
 	private long lastSyncTime = 0;
-	private long cronNums = 0;
+	public static long cronNums = 0;
 
 	private Server() {
 		
@@ -243,13 +241,13 @@ public class Server {
 				if (keyNum > 0) {
 					processFileEvent(serverSelector);
 				}
-				long t1 = System.currentTimeMillis();
-				if (t1 -   latestExpiredTime >= 0) {
+				long t = System.currentTimeMillis();
+				if (t -   latestExpiredTime >= 0) {
 					//processing expired keys
 				}
 				if (aofState == AofState.AOF_ON && syncPolicy == SyncPolicy.EVERY_SECOND
-						&& (t1 - lastSyncTime) >= 1000) {
-					lastSyncTime = t1;
+						&& (t - lastSyncTime) >= 1000) {
+					lastSyncTime = t;
 					aof.fsync();
 				}
 				++cronNums;
