@@ -1,23 +1,46 @@
 package jedis.client;
 
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Scanner;
 
-import jedis.util.JedisConfigration;
 import jedis.util.CommandLine;
+import jedis.util.JedisConfigration;
 import jedis.util.MessageConstant;
 
 public class JedisWorkbench {
 	private SocketChannel clientSocket;
 	private String serverIP;
 	private int serverPort;
+	
+	private void parseConfigLine(String line){
+		if(line != null && line.length() != 0){
+			String[] segs = line.split(":");
+			if(segs.length == 2){
+				if(segs[0].equals("serverIP")){
+					this.serverIP = segs[1];
+				}else if(segs[0].equals("serverPort")){
+					this.serverPort = Integer.parseInt(segs[1]);
+				}
+			}
+		}
+		
+	}
+	
+	private void loadConfig(String confPathName) throws IOException{
+		RandomAccessFile configFile = new RandomAccessFile(confPathName, "r");
+		String line = null;
+		while((line=configFile.readLine()) != null){
+			parseConfigLine(line);
+		}
+		configFile.close();
+	}
 
-	private void init() {
-		this.serverIP = "127.0.0.1";
-		this.serverPort = 8081;
+	private void init() throws IOException {
+		loadConfig("client.conf");
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
 				System.out.println();
@@ -44,9 +67,15 @@ public class JedisWorkbench {
 		return buffer;
 	}
 
-	public boolean connect() {
-		init();
+	public void connect() {
 		try {
+			init();
+		} catch (IOException e) {
+			System.out.println("Failed to read configuration");
+			System.exit(-1);
+		}
+		try {
+			init();
 			clientSocket = SocketChannel.open();
 			clientSocket.configureBlocking(true);
 			clientSocket.connect(new InetSocketAddress(this.serverIP, this.serverPort));
@@ -55,7 +84,6 @@ public class JedisWorkbench {
 			System.out.println("Failed to connect to server");
 			System.exit(-1);
 		}
-		return true;
 	}
 
 	public void start() {
