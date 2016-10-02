@@ -7,6 +7,7 @@ import java.io.RandomAccessFile;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
@@ -53,11 +54,11 @@ public class RDB {
 			int dbIndex = 0;
 			for (JedisDB db : databases) {
 				file.writeInt(dbIndex++);
-				int entrySize = db.getDict().entrySize();
+				Map<Sds, JedisObject> dict = db.getDict();
+				Set<Entry<Sds, JedisObject>> entries = dict.entrySet();
+				int entrySize = dict.entrySet().size();
 				file.writeInt(entrySize);
-				Iterator<JedisEntry<Sds, JedisObject>> iterator = db.getDict().iterator();
-				while(iterator.hasNext()) {
-					JedisEntry<Sds, JedisObject> entry = iterator.next();
+				for(Entry<Sds, JedisObject> entry : entries) {
 					JedisObject key = entry.getKey();
 					JedisObject value = entry.getValue();
 					try {
