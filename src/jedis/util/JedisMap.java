@@ -1,5 +1,6 @@
 package jedis.util;
 
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -86,5 +87,21 @@ public class JedisMap<K extends JedisObject,V extends JedisObject>{
 	
 	public void rehash(){
 		
+	}
+	
+	public List<JedisEntry<K, V>> entryList(){
+		return ht1.entryList();
+	}
+	
+	public List<K> keyList(){
+		return ht1.keyList();
+	}
+	
+	public Iterator<JedisEntry<K, V>> iterator(){
+		return ht1.iterator();
+	}
+	
+	public int entrySize(){
+		return ht1.getUsed();
 	}
 }

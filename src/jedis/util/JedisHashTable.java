@@ -1,6 +1,7 @@
 package jedis.util;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -146,5 +147,47 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 		ht.used = this.used;
 		ht.lengthMask = this.lengthMask;
 		return ht;
+	}
+	
+	public List<JedisEntry<K, V>> entryList() {
+		List<JedisEntry<K, V>> entries = new ArrayList<>(used);
+		for(List<JedisEntry<K, V>> list : table){
+			for(JedisEntry<K, V> entry : list){
+				entries.add(entry);
+			}
+		}
+		return entries;
+	}
+	
+	public List<K> keyList() {
+		List<K> entries = new ArrayList<>(used);
+		for(List<JedisEntry<K, V>> list : table){
+			for(JedisEntry<K, V> entry : list){
+				entries.add(entry.getKey());
+			}
+		}
+		return entries;
+	}
+	
+	public Iterator<JedisEntry<K, V>> iterator(){
+		return new Iterator<JedisEntry<K,V>>() {
+			Iterator<List<JedisEntry<K, V>>> level0Iterator = table.iterator();
+			Iterator<JedisEntry<K, V>> level1Iterator = level0Iterator.next().iterator();
+			
+			@Override
+			public boolean hasNext() {
+				// TODO Auto-generated method stub
+				while(!level1Iterator.hasNext() && level0Iterator.hasNext()){
+					level1Iterator = level0Iterator.next().iterator();
+				}
+				return level1Iterator.hasNext();
+			}
+
+			@Override
+			public JedisEntry<K, V> next() {
+				// TODO Auto-generated method stub
+				return level1Iterator.next();
+			}
+		};
 	}
 }

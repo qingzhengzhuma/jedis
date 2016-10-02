@@ -2,6 +2,8 @@ package jedis.test;
 
 import static org.junit.Assert.*;
 
+import java.util.Iterator;
+
 import org.junit.Test;
 
 import jedis.util.JedisEntry;
@@ -87,6 +89,31 @@ public class JedisHashTableTest {
 		hashTable.put(key, value);
 		assertEquals(true, hashTable.containsKey(key));
 		assertEquals(false, hashTable.containsKey(key1));
+	}
+	
+	@Test
+	public void testIterator(){
+		Sds key = new Sds("msg");
+		JedisObject value = new Sds("Hello World");
+		Sds key1 = new Sds("Another world");
+		JedisObject value1 = new Sds("Another world");
+		JedisHashTable<Sds, JedisObject> ht = new JedisHashTable<>();
+		Iterator<JedisEntry<Sds, JedisObject>> iterator = ht.iterator();
+		assertEquals(false, iterator.hasNext());
+		ht.put(key, value);
+		iterator = ht.iterator();
+		assertEquals(true, iterator.hasNext());
+		JedisEntry<Sds, JedisObject> entry = iterator.next();
+		assertEquals(key,entry.getKey());
+		assertEquals(value, entry.getValue());
+		assertEquals(false, iterator.hasNext());
+		ht.put(key1, value1);
+		iterator = ht.iterator();
+		assertEquals(true, iterator.hasNext());
+		iterator.next();
+		assertEquals(true, iterator.hasNext());
+		iterator.next();
+		assertEquals(false, iterator.hasNext());
 	}
 
 }
