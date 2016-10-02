@@ -10,6 +10,8 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -39,9 +41,30 @@ public class Server {
 	private int hz = 10;
 	private long lastSyncTime = 0;
 	public static long cronNums = 0;
+	
+	List<TimeEvent> timeEvents;
 
 	private Server() {
-		
+		timeEvents = new LinkedList<>();
+	}
+	
+	private TimeEvent getNearestTimeEvent(){
+		TimeEvent event = null;
+		long now = System.currentTimeMillis();
+		long minWaitVal = Long.MAX_VALUE;
+		int i = 0,index = -1;
+		for(TimeEvent e : timeEvents){
+			if(e.excuteTime - now < minWaitVal){
+				event = e;
+				index = i;
+				minWaitVal = e.excuteTime - now;
+			}
+			++i;
+		}
+		if(event != null && event.type == TimeEventType.ONCE){
+			timeEvents.remove(index);
+		}
+		return event;
 	}
 
 	private void loadConfigration() {
@@ -230,28 +253,19 @@ public class Server {
 		iterator.remove();
 	}
 
-	private long getLatestExpireTime() {
-		return 600;
-	}
-
 	private void run() {
 		long frequency = 1000 / hz;
 		try {
 			while (!isStop) {
-				long latestExpiredTime = getLatestExpireTime();
-				long waitTime = Math.min(frequency, latestExpiredTime);
-				int keyNum = serverSelector.select(waitTime);
-				if (keyNum > 0) {
-					processFileEvent(serverSelector);
-				}
-				long t = System.currentTimeMillis();
-				if (t -   latestExpiredTime >= 0) {
-					//processing expired keys
-				}
-				if (aofState == AofState.AOF_ON && syncPolicy == SyncPolicy.EVERY_SECOND
-						&& (t - lastSyncTime) >= 1000) {
-					lastSyncTime = t;
-					aof.fsync();
+				TimeEvent event = getNearestTimeEvent();
+				long latestExpiredTime = event == null ? Long.MAX_VALUE : event.excuteTime;
+				long waitTime = latestExpiredTime - System.currentTimeMillis();
+				if(waitTime < 0) waitTime = 0;
+				waitTime = Math.min(frequency, waitTime);
+				serverSelector.select(waitTime);
+				processFileEvent(serverSelector);
+				if (event != null && event.excuteTime - System.currentTimeMillis() <= 0) {
+					event.process();
 				}
 				++cronNums;
 			}
