@@ -5,10 +5,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.Random;
 
 import jedis.util.CommandLine;
 import jedis.util.JedisConfigration;
+import jedis.util.JedisEntry;
 import jedis.util.JedisObject;
 import jedis.util.Sds;
 
@@ -89,8 +91,11 @@ public class AOF {
 		int dbNum = databases == null ? 0 : databases.length;
 		for (int i = 0; i < dbNum; ++i) {
 			if(databases[i] == null) continue;
-			for (Sds key : databases[i].getDict().keyList()) {
-				JedisObject value = databases[i].get(key);
+			Iterator<JedisEntry<Sds, JedisObject>> iterator = databases[i].getDict().iterator();
+			while (iterator.hasNext()) {
+				JedisEntry<Sds, JedisObject> entry = iterator.next();
+				Sds key = entry.getKey();
+				JedisObject value = entry.getValue();
 				String insertCmd = value.insertCommand(key);
 				aFile.writeBytes(insertCmd);
 				aFile.writeBytes("\r\n");

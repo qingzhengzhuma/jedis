@@ -5,6 +5,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Random;
@@ -20,9 +21,9 @@ public class RDB {
 		int dbNum = 0;
 		RandomAccessFile rdbFile;
 		rdbFile = new RandomAccessFile(rdbFilePath, "r");
-		JedisDB[] databases = Server.inUseDatabases;
 		dbNum = rdbFile.readInt();
-		databases = new JedisDB[dbNum];
+		Server.inUseDatabases = new JedisDB[dbNum];
+		JedisDB[] databases = Server.inUseDatabases;
 		SdsReaderWriter sdsReaderWriter = new SdsReaderWriter();
 		for (int i = 0; i < dbNum; ++i) {
 			databases[i] = new JedisDB();
@@ -52,9 +53,11 @@ public class RDB {
 			int dbIndex = 0;
 			for (JedisDB db : databases) {
 				file.writeInt(dbIndex++);
-				List<JedisEntry<Sds, JedisObject>> entries = db.getDict().entryList();
-				file.writeInt(entries.size());
-				for (JedisEntry<Sds, JedisObject> entry : entries) {
+				int entrySize = db.getDict().entrySize();
+				file.writeInt(entrySize);
+				Iterator<JedisEntry<Sds, JedisObject>> iterator = db.getDict().iterator();
+				while(iterator.hasNext()) {
+					JedisEntry<Sds, JedisObject> entry = iterator.next();
 					JedisObject key = entry.getKey();
 					JedisObject value = entry.getValue();
 					try {
