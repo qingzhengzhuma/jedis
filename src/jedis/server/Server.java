@@ -8,6 +8,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.sql.Time;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -39,30 +40,24 @@ public class Server {
 	public static AOF aof;
 	public static SyncPolicy syncPolicy;
 	private int hz = 10;
-	private long lastSyncTime = 0;
 	public static long cronNums = 0;
-	
 	List<TimeEvent> timeEvents;
+	long lastSyncTime = System.currentTimeMillis();
 
 	private Server() {
 		timeEvents = new LinkedList<>();
+		timeEvents.add(new ServerTimeEvent(System.currentTimeMillis()));
 	}
 	
 	private TimeEvent getNearestTimeEvent(){
 		TimeEvent event = null;
 		long now = System.currentTimeMillis();
 		long minWaitVal = Long.MAX_VALUE;
-		int i = 0,index = -1;
 		for(TimeEvent e : timeEvents){
-			if(e.excuteTime - now < minWaitVal){
+			if(e.when - now < minWaitVal){
 				event = e;
-				index = i;
-				minWaitVal = e.excuteTime - now;
+				minWaitVal = e.when - now;
 			}
-			++i;
-		}
-		if(event != null && event.type == TimeEventType.ONCE){
-			timeEvents.remove(index);
 		}
 		return event;
 	}
@@ -134,26 +129,6 @@ public class Server {
 		}
 	}
 
-	private void handleAcception(SelectionKey key) {
-		ServerSocketChannel server = (ServerSocketChannel) key.channel();
-		try {
-			SocketChannel socketChannel = server.accept();
-			if (socketChannel != null) {
-				socketChannel.configureBlocking(false);
-				socketChannel.register(serverSelector, SelectionKey.OP_READ);
-				String address = getRemoteAddress(socketChannel);
-				clientSockets.put(address, socketChannel);
-				clients.put(address, new JedisClient(address));
-				System.out.println("Received Connection From " + address);
-			} else {
-				System.out.println("Connection receive, but failed to Connect.");
-			}
-
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-
 	private String getRemoteAddress(SocketChannel socketChannel) {
 		try {
 			return socketChannel.getRemoteAddress().toString();
@@ -175,7 +150,7 @@ public class Server {
 					CommandHandler handler = JedisConfigration.getHandler(command);
 					JedisObject object = handler.execute(clients.get(address), cl);
 					if (object == null) {
-						object = new Sds(("nil"));
+						object = new Sds("(nil)");
 					}
 					byte[] result = object.getBytes();
 					return result;
@@ -238,6 +213,26 @@ public class Server {
 			inUseDatabases = initDatabases(databaseNum);
 		}
 	}
+	
+	private void handleAcception(SelectionKey key) {
+		ServerSocketChannel server = (ServerSocketChannel) key.channel();
+		try {
+			SocketChannel socketChannel = server.accept();
+			if (socketChannel != null) {
+				socketChannel.configureBlocking(false);
+				socketChannel.register(serverSelector, SelectionKey.OP_READ);
+				String address = getRemoteAddress(socketChannel);
+				clientSockets.put(address, socketChannel);
+				clients.put(address, new JedisClient(address));
+				System.out.println("Received Connection From " + address);
+			} else {
+				System.out.println("Connection receive, but failed to Connect.");
+			}
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 
 	private void processFileEvent(Selector selector) {
 		Set<SelectionKey> selecedKeys = selector.selectedKeys();
@@ -252,22 +247,29 @@ public class Server {
 		}
 		iterator.remove();
 	}
+	
+	private void processTimeEvent(TimeEvent event) {
+		long now = System.currentTimeMillis();
+		if(event != null && event.when <= now){
+			long t = event.process();
+			if(t > 0){
+				event.when += t;
+			}else {
+				timeEvents.remove(event);
+			}
+		}
+	}
 
 	private void run() {
-		long frequency = 1000 / hz;
 		try {
 			while (!isStop) {
 				TimeEvent event = getNearestTimeEvent();
-				long latestExpiredTime = event == null ? Long.MAX_VALUE : event.excuteTime;
+				long latestExpiredTime = event == null ? Long.MAX_VALUE : event.when;
 				long waitTime = latestExpiredTime - System.currentTimeMillis();
 				if(waitTime < 0) waitTime = 0;
-				waitTime = Math.min(frequency, waitTime);
 				serverSelector.select(waitTime);
 				processFileEvent(serverSelector);
-				if (event != null && event.excuteTime - System.currentTimeMillis() <= 0) {
-					event.process();
-				}
-				++cronNums;
+				processTimeEvent(event);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -278,5 +280,27 @@ public class Server {
 		Server server = new Server();
 		server.init();
 		server.run();
+	}
+	
+	class ServerTimeEvent extends TimeEvent{
+		ServerTimeEvent(long when) {
+			// TODO Auto-generated constructor stub
+			super(when);
+		}
+		
+		@Override
+		public long process(){
+			if(aofState == AofState.AOF_ON &&
+				aof != null &&
+				syncPolicy == SyncPolicy.EVERY_SECOND){
+				long now = System.currentTimeMillis();
+				if(now - lastSyncTime >= 1000){
+					aof.fsync();
+					lastSyncTime = now;
+				}
+			}
+			++cronNums;
+			return 1000 / hz;
+		}
 	}
 }

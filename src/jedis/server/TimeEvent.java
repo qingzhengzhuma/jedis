@@ -1,18 +1,10 @@
 package jedis.server;
 
-class TimeEvent {
-	long excuteTime;
-	TimeEventHandler handler;
-	TimeEventType type;
-	public TimeEvent(long excuteTime,TimeEventHandler handler,TimeEventType type){
-		this.excuteTime = excuteTime;
-		this.handler = handler;
-		this.type = type;
+abstract class TimeEvent {
+	long when;
+	public TimeEvent(long when){
+		this.when = when;
 	}
 	
-	public void process(){
-		if(handler != null){
-			handler.process();
-		}
-	}
+	abstract public long process();
 }
