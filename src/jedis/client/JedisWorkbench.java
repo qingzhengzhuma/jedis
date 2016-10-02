@@ -44,6 +44,14 @@ public class JedisWorkbench {
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
 				System.out.println();
+				if(clientSocket != null && clientSocket.isOpen()){
+					try{
+						clientSocket.close();
+					}catch(IOException e){
+						e.printStackTrace();
+					}
+					
+				}
 			}
 		});
 	}
