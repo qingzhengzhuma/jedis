@@ -20,7 +20,9 @@ public class SetHandler implements CommandHandler{
 			if(!(object instanceof Sds)) throw new UnsupportedOperationException();
 		}
 		db.set(key, value);
-		Server.aof.put(cl,curDB);
+		if(Server.aofState == AofState.AOF_ON){
+			Server.aof.put(cl,curDB);
+		}
 		return MessageConstant.OK;
 	}
 }

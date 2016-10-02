@@ -19,7 +19,9 @@ public class DeleteHandle implements CommandHandler {
 				++deletedCount;
 			}
 		}
-		Server.aof.put(cl,curDB);
+		if(Server.aofState == AofState.AOF_ON){
+			Server.aof.put(cl,curDB);
+		}
 		if(deletedCount < MessageConstant.NUMBER_COUNT){
 			return MessageConstant.NUMBERS[deletedCount];
 		}

@@ -45,7 +45,7 @@ public class Server {
 	}
 
 	private void loadConfigration() {
-		aofState = AofState.AOF_ON;
+		aofState = AofState.AOF_OFF;
 		syncPolicy = SyncPolicy.EVERY_SECOND;
 	}
 
@@ -68,15 +68,18 @@ public class Server {
 			serverSocketChannel.socket().bind(new InetSocketAddress(LISTEN_PORT));
 			serverSocketChannel.configureBlocking(false);
 			serverSocketChannel.register(serverSelector, SelectionKey.OP_ACCEPT);
-			aof = AOF.openForAppend(JedisConfigration.aofPathName);
 			loadDatabase();
-			aof = AOF.openForAppend(JedisConfigration.aofPathName);
-			aof.setAofState(aofState);
-			aof.setSyncPolicy(syncPolicy);
+			if(aofState == AofState.AOF_ON){
+				aof = AOF.openForAppend(JedisConfigration.aofPathName);
+				aof.setAofState(aofState);
+				aof.setSyncPolicy(syncPolicy);
+			}
 			Runtime.getRuntime().addShutdownHook(new Thread(){
 				@Override
 				public void run(){
-					aof.close();
+					if(aofState == AofState.AOF_ON){
+						aof.close();
+					}
 				}
 			});
 		} catch (IOException e) {
@@ -204,7 +207,7 @@ public class Server {
 	}
 
 	private void loadDatabase() throws IOException {
-		if (new File(JedisConfigration.aofPathName).exists()) {
+		if (aofState == AofState.AOF_ON) {
 			AOF.load(JedisConfigration.aofPathName);
 		} else if (new File(JedisConfigration.rdbPathName).exists()) {
 			RDB.load(JedisConfigration.rdbPathName);
