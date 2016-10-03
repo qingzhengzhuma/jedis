@@ -17,8 +17,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import jedis.util.CommandLine;
-import jedis.util.JedisObject;
 import jedis.util.Sds;
 
 public class Server {
@@ -143,30 +141,9 @@ public class Server {
 	}
 
 	private byte[] processCommand(SocketChannel clientChannel, byte[] data) {
-		CommandLine cl = new CommandLine();
-		if (cl.parse(new String(data))) {
-			String command = cl.getNormalizedCmd();
-			int argc = cl.getArgc();
-			if (CommandHandler.verifyCommand(command, argc) == true) {
-				String address = getRemoteAddress(clientChannel);
-				try {
-					CommandHandler handler = CommandHandler.getHandler(command);
-					JedisObject object = handler.execute(clients.get(address), cl);
-					if (object == null) {
-						object = new Sds("(nil)");
-					}
-					byte[] result = object.getBytes();
-					return result;
-				} catch (UnsupportedOperationException e) {
-					// TODO: handle exception
-					return MessageConstant.NOT_SUPPORTED_OPERATION.getBytes();
-				} catch (IllegalArgumentException e) {
-					// TODO: handle exception
-					return MessageConstant.ILLEGAL_ARGUMENT.getBytes();
-				}
-			}
-		}
-		return MessageConstant.ILLEGAL_COMMAND.getBytes();
+		String address = getRemoteAddress(clientChannel);
+		JedisClient client = clients.get(address);
+		return CommandHandler.executeCommand(client, data).getBytes();
 	}
 
 	private boolean sendResponse(SocketChannel clientChannel, byte[] result) {

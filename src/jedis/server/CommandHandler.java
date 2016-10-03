@@ -14,6 +14,7 @@ abstract public class CommandHandler {
 			new CommandRule("append", 2, 2, new AppendHandler()),
 			new CommandRule("del", 1, Integer.MAX_VALUE, new DeleteHandle()),
 			new CommandRule("save", 0, 0, new SaveHandler()),
+			new CommandRule("bgsave", 0, 0, new BgSaveHandler()),
 			new CommandRule("expire", 2, 2, new ExpireHandler()),
 		};
 	
@@ -26,6 +27,29 @@ abstract public class CommandHandler {
 			throw new UnsupportedOperationException();
 		}
 	};
+	
+	public static JedisObject executeCommand(JedisClient client,byte[] data){
+		CommandLine cl = new CommandLine();
+		if (cl.parse(new String(data))) {
+			String command = cl.getNormalizedCmd();
+			int argc = cl.getArgc();
+			if (CommandHandler.verifyCommand(command, argc) == true) {
+				try {
+					CommandHandler handler = CommandHandler.getHandler(command);
+					JedisObject object = handler.execute(client, cl);
+					if(object == null) object = MessageConstant.NIL;
+					return object;
+				} catch (UnsupportedOperationException e) {
+					// TODO: handle exception
+					return MessageConstant.NOT_SUPPORTED_OPERATION;
+				} catch (IllegalArgumentException e) {
+					// TODO: handle exception
+					return MessageConstant.ILLEGAL_ARGUMENT;
+				}
+			}
+		}
+		return MessageConstant.ILLEGAL_COMMAND;
+	}
 	
 	public static CommandHandler getHandler(String cmd){
 		for(CommandRule rule : commandRules){
@@ -48,7 +72,7 @@ abstract public class CommandHandler {
 		return false;
 	}
 	
-	abstract public JedisObject execute(JedisClient client,CommandLine cl) 
+	abstract protected JedisObject execute(JedisClient client,CommandLine cl) 
 			throws UnsupportedOperationException;
 }
 
@@ -84,7 +108,16 @@ class BgSaveHandler extends CommandHandler{
 	@Override
 	public JedisObject execute(JedisClient client, CommandLine cl) 
 			throws UnsupportedOperationException {
-		if(Server.aofSaveThread.isAlive()) return MessageConstant.AOF_BUSY;
+		if(Server.aofSaveThread != null &&
+				Server.aofSaveThread.isAlive()){
+			return MessageConstant.AOF_BUSY;
+		}
+		
+		if(Server.rdbSaveThread != null &&
+				Server.rdbSaveThread.isAlive()){
+			return MessageConstant.RDB_BUSY;
+		}
+		
 		int dbNum = Server.inUseDatabases.length;
 		JedisDB[] dbs = new JedisDB[dbNum];
 		for(int i = 0; i < dbNum;++i){

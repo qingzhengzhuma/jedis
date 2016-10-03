@@ -3,6 +3,11 @@ package jedis.test;
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -10,7 +15,9 @@ import org.junit.Test;
 import jedis.server.JedisConfigration;
 import jedis.server.JedisDB;
 import jedis.server.RDB;
+import jedis.server.RdbSaveThread;
 import jedis.server.Server;
+import jedis.util.JedisObject;
 import jedis.util.Sds;
 
 public class rdbReadWriteTest {
@@ -28,7 +35,7 @@ public class rdbReadWriteTest {
 		}
 	}
 	
-	@Test
+	//@Test
 	public void test(){
 		databases = new JedisDB[16];
 		for(int i = 0; i < 16;++i){
@@ -42,13 +49,13 @@ public class rdbReadWriteTest {
 	@Test
 	public void testWriteAndRead(){
 		try {
-			/*RdbSaveThread thread = new RdbSaveThread(databases);
+			RdbSaveThread thread = new RdbSaveThread(databases);
 			thread.start();
-			thread.join();*/
+			thread.join();
 			RDB.load(JedisConfigration.rdbPathName);
 			JedisDB[] dbs = Server.inUseDatabases;
 			assertEquals(databases.length, dbs.length);
-			/*Class<?> dbClass = JedisDB.class;
+			Class<?> dbClass = JedisDB.class;
 			try {
 				Method getDict = dbClass.getDeclaredMethod("getDict");
 				getDict.setAccessible(true);
@@ -83,12 +90,12 @@ public class rdbReadWriteTest {
 			} catch (InvocationTargetException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			}*/
+			}
 			
-		} /*catch (InterruptedException e) {
+		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		} */catch (IOException e) {
+		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}

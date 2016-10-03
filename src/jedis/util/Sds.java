@@ -43,6 +43,16 @@ public class Sds implements JedisObject{
 		}
 	}
 	
+	public Sds(Sds init){
+		int length = init == null ? 0 : init.used;
+		this.used = length;
+		this.free = 0;
+		this.content = new byte[length];
+		for(int i = 0; i < length; ++i){
+			this.content[i] = init.content[i];
+		}
+	}
+	
 	public Sds clone(){
 		return new Sds(this.content);
 	}
@@ -208,9 +218,7 @@ public class Sds implements JedisObject{
 	
 	@Override
 	public Sds deepCopy(){
-		Sds sds = new Sds(this.used);;
-		sds.copyFrom(this);
-		return sds;
+		return new Sds(this);
 	}
 	
 	@Override
