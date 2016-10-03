@@ -10,7 +10,6 @@ import java.util.Map.Entry;
 import java.util.Random;
 
 import jedis.util.CommandLine;
-import jedis.util.JedisConfigration;
 import jedis.util.JedisObject;
 import jedis.util.Sds;
 

@@ -8,10 +8,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.sql.Time;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -20,9 +18,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import jedis.util.CommandLine;
-import jedis.util.JedisConfigration;
 import jedis.util.JedisObject;
-import jedis.util.MessageConstant;
 import jedis.util.Sds;
 
 public class Server {
@@ -294,8 +290,7 @@ public class Server {
 				TimeEvent event = getNearestTimeEvent();
 				long latestExpiredTime = event == null ? Long.MAX_VALUE : event.when;
 				long waitTime = latestExpiredTime - System.currentTimeMillis();
-				if (waitTime < 0)
-					waitTime = 0;
+				if (waitTime < 0) waitTime = 0;
 				serverSelector.select(waitTime);
 				processFileEvent(serverSelector);
 				processTimeEvent(event);

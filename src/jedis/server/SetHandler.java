@@ -2,7 +2,6 @@ package jedis.server;
 
 import jedis.util.CommandLine;
 import jedis.util.JedisObject;
-import jedis.util.MessageConstant;
 import jedis.util.Sds;
 
 public class SetHandler implements CommandHandler{

@@ -1,9 +1,7 @@
 package jedis.server;
 
 import jedis.util.CommandLine;
-import jedis.util.JedisConfigration;
 import jedis.util.JedisObject;
-import jedis.util.MessageConstant;
 
 public class SaveHandler implements CommandHandler {
 

@@ -1,6 +1,6 @@
 package jedis.server;
 
-import jedis.util.JedisConfigration;
+import jedis.server.JedisConfigration;
 
 public class RdbSaveThread extends Thread {
 	private JedisDB[] databases;
