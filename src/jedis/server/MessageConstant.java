@@ -20,6 +20,11 @@ public final class MessageConstant {
 	public static final JedisObject AOF_BUSY = new Sds("AOF Serlization Is Running");
 	public static final JedisObject RDB_BUSY = new Sds("RDB Serlization Is Running");
 	public static final JedisObject NIL = new Sds("nil");
+	public static final JedisObject MULTI_CANNOT_BE_NEST = new Sds("Multi can't be nested");
+	public static final JedisObject EXEC_WITHOUT_MULTI = new Sds("Exec without multi");
+	public static final JedisObject ERROR_HAPPED_IN_TRANSACTIOIN = new Sds("Transaction discarded because of previous errors");
+	public static final JedisObject MULTI_COMMAND_EMPTY = new Sds("Empty list or set");
+	public static final JedisObject QUEUED = new Sds("QUEUED");
 	public static final JedisObject[] NUMBERS;
 	static{
 		NUMBERS = new Sds[NUMBER_COUNT];

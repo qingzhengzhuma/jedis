@@ -21,7 +21,6 @@ import jedis.util.Sds;
 
 public class Server {
 	private Selector serverSelector;
-	private Map<String, SocketChannel> clientSockets;
 	private Map<String, JedisClient> clients;
 	private ServerSocketChannel serverSocketChannel;
 
@@ -29,7 +28,6 @@ public class Server {
 	private boolean isStop = false;
 	private static int databaseNum = 16;
 	public static JedisDB[] inUseDatabases;
-	public static Map<Sds,Long>[] expireKeys;
 	// public static JedisDB[] bufDatabases;
 	// public static JedisDB[] deletedDatabases;
 	public static RdbSaveThread rdbSaveThread;
@@ -66,13 +64,10 @@ public class Server {
 		syncPolicy = SyncPolicy.EVERY_SECOND;
 	}
 
-	@SuppressWarnings("unchecked")
 	public static void initDatabases(int dbNum) {
 		inUseDatabases = new JedisDB[dbNum];
-		expireKeys = (Map<Sds,Long>[])new HashMap[dbNum];
 		for (int i = 0; i < dbNum; ++i) {
 			inUseDatabases[i] = new JedisDB();
-			expireKeys[i] = new HashMap<>();
 		}
 		
 	}
@@ -80,7 +75,6 @@ public class Server {
 	public boolean init() {
 		try {
 			loadConfigration();
-			clientSockets = new HashMap<>();
 			clients = new HashMap<>();
 			serverSelector = Selector.open();
 			serverSocketChannel = ServerSocketChannel.open();
@@ -120,7 +114,6 @@ public class Server {
 			SocketChannel clientChannel = (SocketChannel) key.channel();
 			if (clientChannel != null) {
 				String address = clientChannel.getRemoteAddress().toString();
-				clientSockets.remove(address);
 				clients.remove(address);
 				clientChannel.close();
 				System.out.println(address + " " + MessageConstant.CONNECTION_CLOSED);
@@ -202,8 +195,7 @@ public class Server {
 				socketChannel.configureBlocking(false);
 				socketChannel.register(serverSelector, SelectionKey.OP_READ);
 				String address = getRemoteAddress(socketChannel);
-				clientSockets.put(address, socketChannel);
-				clients.put(address, new JedisClient(address));
+				clients.put(address, new JedisClient(address,socketChannel));
 				System.out.println("Received Connection From " + address);
 			} else {
 				System.out.println("Connection receive, but failed to Connect.");
@@ -212,27 +204,6 @@ public class Server {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
-	
-	public static boolean isKeyExpired(Sds key,int dbIndex){
-		Long expireTime = null;
-		if(dbIndex >= 0 && dbIndex < databaseNum &&
-				(expireTime = expireKeys[dbIndex].get(key)) != null &&
-				System.currentTimeMillis() >= expireTime){
-			return true;
-		}
-		return false;
-	}
-	
-	public static void removeIfExpired(Sds key,int dbIndex){
-		if(isKeyExpired(key, dbIndex)){
-			removeExpiredKey(key, dbIndex);
-		}
-	}
-	
-	public static void removeExpiredKey(Sds key,int dbIndex){
-		inUseDatabases[dbIndex].remove(key);
-		expireKeys[dbIndex].remove(key);
 	}
 
 	private void processFileEvent(Selector selector) {
@@ -319,14 +290,15 @@ public class Server {
 		
 		private void processExpireKeys(){
 			List<Sds> expiredKeys = new ArrayList<>();
-			for(Entry<Sds, Long> entry : expireKeys[lastExpiredDbIndex].entrySet()){
+			JedisDB db = Server.inUseDatabases[lastExpiredDbIndex];
+			for(Entry<Sds, Long> entry : db.expireKeys.entrySet()){
 				Sds key = entry.getKey();
-				if(isKeyExpired(entry.getKey(), lastExpiredDbIndex)){
+				if(db.isKeyExpired(key)){
 					expiredKeys.add(key);
 				}
 			}
 			for(Sds key : expiredKeys){
-				removeExpiredKey(key, lastExpiredDbIndex);
+				db.removeExpiredKey(key);
 			}
 			lastExpiredDbIndex = (lastExpiredDbIndex + 1) % databaseNum;
 		}

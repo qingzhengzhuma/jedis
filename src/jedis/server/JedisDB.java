@@ -1,18 +1,23 @@
 package jedis.server;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
 
 import jedis.util.JedisObject;
 import jedis.util.Sds;
 
 public class JedisDB{
-	private Map<Sds, JedisObject> dict;
+	int id;
+	Map<Sds, JedisObject> dict;
+	Map<Sds, List<JedisClient>> watchedKeys;
+	Map<Sds, Long> expireKeys;
 	
 	public JedisDB(){
 		dict = new HashMap<>();
+		watchedKeys = new HashMap<>();
+		expireKeys = new HashMap<>();
 	}
 	
 	public boolean containsKey(Sds key){
@@ -43,5 +48,25 @@ public class JedisDB{
 			db.set(key, value);
 		}
 		return db;
+	}
+	
+	public boolean isKeyExpired(Sds key){
+		Long expireTime = null;
+		if((expireTime = expireKeys.get(key)) != null &&
+				System.currentTimeMillis() >= expireTime){
+			return true;
+		}
+		return false;
+	}
+	
+	public void removeIfExpired(Sds key){
+		if(isKeyExpired(key)){
+			removeExpiredKey(key);
+		}
+	}
+	
+	public void removeExpiredKey(Sds key){
+		expireKeys.remove(key);
+		dict.remove(key);
 	}
 }

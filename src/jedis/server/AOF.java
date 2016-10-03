@@ -58,10 +58,10 @@ public class AOF {
 		}
 	}
 
-	public void put(CommandLine cmd,int dbIndex){
+	public void put(CommandLine cmd,JedisDB db){
 		if(state == AofState.AOF_ON) {
 			try {
-				aofFile.writeInt(dbIndex);
+				aofFile.writeInt(db.id);
 				aofFile.writeBytes(cmd.getNormalizedCmdLine());
 				aofFile.writeBytes("\r\n");
 				if(this.syncPolicy == SyncPolicy.ALWAYS){
@@ -97,7 +97,7 @@ public class AOF {
 			Map<Sds, JedisObject> dict = databases[i].getDict();
 			for(Entry<Sds, JedisObject> entry : dict.entrySet()){
 				Sds key = entry.getKey();
-				if(Server.expireKeys[i].containsKey(key)) continue;
+				if(databases[i].expireKeys.containsKey(key)) continue;
 				JedisObject value = entry.getValue();
 				String insertCmd = value.insertCommand(key);
 				aFile.writeBytes(insertCmd);
@@ -114,12 +114,12 @@ public class AOF {
 	
 	public static void load(String aofPathName) throws IOException{
 		RandomAccessFile file = new RandomAccessFile(aofPathName, "r");
-		JedisClient fakeClient = new JedisClient("0.0.0.0:0");
+		JedisClient fakeClient = new JedisClient("0.0.0.0:0",null);
 		long length = file.length();
 		while(length > 0){
 			int dbIndex = file.readInt();
 			String cmd = file.readLine();
-			fakeClient.setCurrentDB(dbIndex);
+			fakeClient.db = Server.inUseDatabases[dbIndex];
 			CommandLine cl = new CommandLine();
 			cl.parse(cmd);
 			CommandHandler handler = CommandHandler.getHandler(cl.getCommand());
