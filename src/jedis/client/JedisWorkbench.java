@@ -8,7 +8,6 @@ import java.nio.channels.SocketChannel;
 import java.util.Scanner;
 
 import jedis.util.CommandLine;
-import jedis.util.JedisConfigration;
 import jedis.util.MessageConstant;
 
 public class JedisWorkbench {
@@ -103,8 +102,11 @@ public class JedisWorkbench {
 				CommandLine cl = new CommandLine();
 				if (cl.parse(line)) {
 					String command = cl.getNormalizedCmd();
-					int argc = cl.getArgc();
-					if (JedisConfigration.verifyCommand(command, argc) == true) {
+					if (command.equals("quit") || command.equals("exit")) {
+						clientSocket.close();
+						System.out.println(MessageConstant.BYE);
+						break;
+					}else {
 						command = cl.getNormalizedCmdLine();
 						ByteBuffer buffer = wrapCommandToBuffer(command);
 						while (buffer.hasRemaining()) {
@@ -117,12 +119,6 @@ public class JedisWorkbench {
 						}
 						readBuffer.flip();
 						System.out.println(new String(readBuffer.array()));
-					} else if (command.equals("quit") || command.equals("exit")) {
-						clientSocket.close();
-						System.out.println(MessageConstant.BYE);
-						break;
-					} else {
-						System.out.println(MessageConstant.ILLEGAL_COMMAND);
 					}
 				}
 				System.out.print(promptSymbol);
