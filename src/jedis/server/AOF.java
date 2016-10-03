@@ -5,14 +5,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 
 import jedis.util.CommandLine;
 import jedis.util.JedisConfigration;
-import jedis.util.JedisEntry;
 import jedis.util.JedisObject;
 import jedis.util.Sds;
 
@@ -81,6 +79,10 @@ public class AOF {
 		return aofFile.readLine();
 	}
 	
+	public long size() throws IOException{
+		return aofFile.length();
+	}
+	
 	public void rewind() throws IOException{
 		aofFile.seek(0);
 	}
@@ -96,6 +98,7 @@ public class AOF {
 			Map<Sds, JedisObject> dict = databases[i].getDict();
 			for(Entry<Sds, JedisObject> entry : dict.entrySet()){
 				Sds key = entry.getKey();
+				if(Server.expireKeys[i].containsKey(key)) continue;
 				JedisObject value = entry.getValue();
 				String insertCmd = value.insertCommand(key);
 				aFile.writeBytes(insertCmd);

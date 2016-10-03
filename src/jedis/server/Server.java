@@ -9,11 +9,14 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.sql.Time;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import jedis.util.CommandLine;
@@ -32,8 +35,9 @@ public class Server {
 	private boolean isStop = false;
 	private static int databaseNum = 16;
 	public static JedisDB[] inUseDatabases;
-	//public static JedisDB[] bufDatabases;
-	//public static JedisDB[] deletedDatabases;
+	public static Map<Sds,Long>[] expireKeys;
+	// public static JedisDB[] bufDatabases;
+	// public static JedisDB[] deletedDatabases;
 	public static RdbSaveThread rdbSaveThread;
 	public static AofSaveThread aofSaveThread;
 	public static AofState aofState = AofState.AOF_OFF;
@@ -43,18 +47,19 @@ public class Server {
 	public static long cronNums = 0;
 	List<TimeEvent> timeEvents;
 	long lastSyncTime = System.currentTimeMillis();
+	public static final long aofFileSizeThreshold = 1024 * 1024 * 256; // 256MB
 
 	private Server() {
 		timeEvents = new LinkedList<>();
 		timeEvents.add(new ServerTimeEvent(System.currentTimeMillis()));
 	}
-	
-	private TimeEvent getNearestTimeEvent(){
+
+	private TimeEvent getNearestTimeEvent() {
 		TimeEvent event = null;
 		long now = System.currentTimeMillis();
 		long minWaitVal = Long.MAX_VALUE;
-		for(TimeEvent e : timeEvents){
-			if(e.when - now < minWaitVal){
+		for (TimeEvent e : timeEvents) {
+			if (e.when - now < minWaitVal) {
 				event = e;
 				minWaitVal = e.when - now;
 			}
@@ -67,18 +72,20 @@ public class Server {
 		syncPolicy = SyncPolicy.EVERY_SECOND;
 	}
 
-	public static JedisDB[] initDatabases(int dbNum) {
-		JedisDB[] dbs = new JedisDB[dbNum];
+	@SuppressWarnings("unchecked")
+	public static void initDatabases(int dbNum) {
+		inUseDatabases = new JedisDB[dbNum];
+		expireKeys = (Map<Sds,Long>[])new HashMap[dbNum];
 		for (int i = 0; i < dbNum; ++i) {
-			dbs[i] = new JedisDB();
+			inUseDatabases[i] = new JedisDB();
+			expireKeys[i] = new HashMap<>();
 		}
-		return dbs;
+		
 	}
 
 	public boolean init() {
 		try {
 			loadConfigration();
-			inUseDatabases = initDatabases(databaseNum);
 			clientSockets = new HashMap<>();
 			clients = new HashMap<>();
 			serverSelector = Selector.open();
@@ -87,15 +94,15 @@ public class Server {
 			serverSocketChannel.configureBlocking(false);
 			serverSocketChannel.register(serverSelector, SelectionKey.OP_ACCEPT);
 			loadDatabase();
-			if(aofState == AofState.AOF_ON){
+			if (aofState == AofState.AOF_ON) {
 				aof = AOF.openForAppend(JedisConfigration.aofPathName);
 				aof.setAofState(aofState);
 				aof.setSyncPolicy(syncPolicy);
 			}
-			Runtime.getRuntime().addShutdownHook(new Thread(){
+			Runtime.getRuntime().addShutdownHook(new Thread() {
 				@Override
-				public void run(){
-					if(aofState == AofState.AOF_ON){
+				public void run() {
+					if (aofState == AofState.AOF_ON) {
 						aof.close();
 					}
 				}
@@ -210,10 +217,10 @@ public class Server {
 		} else if (new File(JedisConfigration.rdbPathName).exists()) {
 			RDB.load(JedisConfigration.rdbPathName);
 		} else {
-			inUseDatabases = initDatabases(databaseNum);
+			initDatabases(databaseNum);
 		}
 	}
-	
+
 	private void handleAcception(SelectionKey key) {
 		ServerSocketChannel server = (ServerSocketChannel) key.channel();
 		try {
@@ -233,6 +240,27 @@ public class Server {
 			e.printStackTrace();
 		}
 	}
+	
+	public static boolean isKeyExpired(Sds key,int dbIndex){
+		Long expireTime = null;
+		if(dbIndex >= 0 && dbIndex < databaseNum &&
+				(expireTime = expireKeys[dbIndex].get(key)) != null &&
+				System.currentTimeMillis() <= expireTime){
+			return true;
+		}
+		return false;
+	}
+	
+	public static void removeIfExpired(Sds key,int dbIndex){
+		if(isKeyExpired(key, dbIndex)){
+			removeExpiredKey(key, dbIndex);
+		}
+	}
+	
+	public static void removeExpiredKey(Sds key,int dbIndex){
+		inUseDatabases[dbIndex].remove(key);
+		expireKeys[dbIndex].remove(key);
+	}
 
 	private void processFileEvent(Selector selector) {
 		Set<SelectionKey> selecedKeys = selector.selectedKeys();
@@ -247,14 +275,14 @@ public class Server {
 		}
 		iterator.remove();
 	}
-	
+
 	private void processTimeEvent(TimeEvent event) {
 		long now = System.currentTimeMillis();
-		if(event != null && event.when <= now){
+		if (event != null && event.when <= now) {
 			long t = event.process();
-			if(t > 0){
+			if (t > 0) {
 				event.when += t;
-			}else {
+			} else {
 				timeEvents.remove(event);
 			}
 		}
@@ -266,7 +294,8 @@ public class Server {
 				TimeEvent event = getNearestTimeEvent();
 				long latestExpiredTime = event == null ? Long.MAX_VALUE : event.when;
 				long waitTime = latestExpiredTime - System.currentTimeMillis();
-				if(waitTime < 0) waitTime = 0;
+				if (waitTime < 0)
+					waitTime = 0;
 				serverSelector.select(waitTime);
 				processFileEvent(serverSelector);
 				processTimeEvent(event);
@@ -281,24 +310,59 @@ public class Server {
 		server.init();
 		server.run();
 	}
-	
-	class ServerTimeEvent extends TimeEvent{
+
+	class ServerTimeEvent extends TimeEvent {
+		private int lastExpiredDbIndex = 0;
 		ServerTimeEvent(long when) {
 			// TODO Auto-generated constructor stub
 			super(when);
 		}
 		
-		@Override
-		public long process(){
-			if(aofState == AofState.AOF_ON &&
-				aof != null &&
-				syncPolicy == SyncPolicy.EVERY_SECOND){
-				long now = System.currentTimeMillis();
-				if(now - lastSyncTime >= 1000){
-					aof.fsync();
-					lastSyncTime = now;
+		private void processAOF() {
+			if (aofState == AofState.AOF_ON && aof != null) {
+				if (syncPolicy == SyncPolicy.EVERY_SECOND) {
+					long now = System.currentTimeMillis();
+					if (now - lastSyncTime >= 1000) {
+						aof.fsync();
+						lastSyncTime = now;
+					}
+				}
+				try {
+					if (aof.size() >= aofFileSizeThreshold) {
+						aof.close();
+						AofSaveThread t = new AofSaveThread();
+						t.start();
+						t.join();
+						aof = AOF.openForAppend(JedisConfigration.aofPathName);
+					}
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
 				}
 			}
+		}
+		
+		private void processExpireKeys(){
+			List<Sds> expiredKeys = new ArrayList<>();
+			for(Entry<Sds, Long> entry : expireKeys[lastExpiredDbIndex].entrySet()){
+				Sds key = entry.getKey();
+				if(isKeyExpired(entry.getKey(), lastExpiredDbIndex)){
+					expiredKeys.add(key);
+				}
+			}
+			for(Sds key : expiredKeys){
+				removeExpiredKey(key, lastExpiredDbIndex);
+			}
+			lastExpiredDbIndex = (lastExpiredDbIndex + 1) % databaseNum;
+		}
+
+		@Override
+		public long process() {
+			processAOF();
+			processExpireKeys();
 			++cronNums;
 			return 1000 / hz;
 		}

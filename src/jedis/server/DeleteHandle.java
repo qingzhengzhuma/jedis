@@ -15,6 +15,7 @@ public class DeleteHandle implements CommandHandler {
 		int curDB = client.getCurrntDB();
 		for(int i = 0; i < keyCount;++i){
 			Sds key = new Sds(cl.getArg(i));
+			Server.removeIfExpired(key, curDB);
 			if(Server.inUseDatabases[curDB].remove(key)){
 				++deletedCount;
 			}

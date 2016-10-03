@@ -11,6 +11,7 @@ public class GetHandler implements CommandHandler {
 		// TODO Auto-generated method stub
 		int curDB = client.getCurrntDB();
 		Sds key = new Sds(cl.getArg(0));
+		Server.removeIfExpired(key, curDB);
 		return Server.inUseDatabases[curDB].get(key);
 	}
 

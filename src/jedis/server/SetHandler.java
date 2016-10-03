@@ -14,6 +14,7 @@ public class SetHandler implements CommandHandler{
 		int curDB = client.getCurrntDB();
 		JedisDB db = Server.inUseDatabases[curDB];
 		Sds key = new Sds(cl.getArg(0));
+		Server.removeIfExpired(key, curDB);
 		JedisObject value = new Sds(cl.getArg(1));
 		if(db.containsKey(key)){
 			JedisObject object = db.get(key);

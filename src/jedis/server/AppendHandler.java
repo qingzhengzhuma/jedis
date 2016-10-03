@@ -13,6 +13,7 @@ public class AppendHandler implements CommandHandler{
 		int curDB = client.getCurrntDB();
 		JedisDB db = Server.inUseDatabases[curDB];
 		Sds key = new Sds(cl.getArg(0));
+		Server.removeIfExpired(key, curDB);
 		JedisObject value;
 		if(db.containsKey(key)){
 			value = db.get(key);

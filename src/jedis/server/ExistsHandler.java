@@ -13,7 +13,7 @@ public class ExistsHandler implements CommandHandler {
 		// TODO Auto-generated method stub
 		Sds key = new Sds(cl.getArg(0));
 		int curDB = client.getCurrntDB();
-		
+		Server.removeIfExpired(key, curDB);
 		if(Server.inUseDatabases[curDB].containsKey(key)){
 			return MessageConstant.YES;
 		}else{
