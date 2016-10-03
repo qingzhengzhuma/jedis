@@ -245,7 +245,7 @@ public class Server {
 		Long expireTime = null;
 		if(dbIndex >= 0 && dbIndex < databaseNum &&
 				(expireTime = expireKeys[dbIndex].get(key)) != null &&
-				System.currentTimeMillis() <= expireTime){
+				System.currentTimeMillis() >= expireTime){
 			return true;
 		}
 		return false;
