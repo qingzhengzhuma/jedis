@@ -2,6 +2,9 @@ package jedis.test;
 
 import static org.junit.Assert.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.junit.Test;
 
 import jedis.util.JedisMap;
@@ -65,6 +68,23 @@ public class JedisMapTest {
 		assertEquals(null, map.remove(key));
 		map.put(key1, value1);
 		assertEquals(value1, map.remove(key1));
+	}
+	
+	@Test
+	public void testJedisMapPerformance() {
+		JedisMap<Sds, JedisObject> map = new JedisMap<>();
+		
+		for(int i = 1; i <= 100000;++i){
+			map.put(new Sds(Integer.toString(i)), new Sds(Integer.toString(i+1)));
+		}
+	}
+	
+	@Test
+	public void testJdkMapPerformance() {
+		HashMap<Sds, JedisObject> map = new HashMap<>();
+		for(int i = 1; i <= 400000;++i){
+			map.put(new Sds(Integer.toString(i)), new Sds(Integer.toString(i+1)));
+		}
 	}
 
 }

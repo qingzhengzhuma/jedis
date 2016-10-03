@@ -7,6 +7,6 @@ public interface JedisObject{
 	public byte[] getBytes();
 	public JedisObject type();
 	public void writeObject(RandomAccessFile file) throws IOException;
-	public JedisObject deepClone();
+	public JedisObject deepCopy();
 	public String insertCommand(Sds key);
 }

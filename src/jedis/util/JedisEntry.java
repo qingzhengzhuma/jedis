@@ -4,10 +4,12 @@ public class JedisEntry<K extends JedisObject,V extends JedisObject>{
 	
 	private K key;
 	private V value;
+	private int hash;
 	
-	public JedisEntry(K key,V value){
+	public JedisEntry(K key,V value,int hash){
 		this.key = key;
 		this.value = value;
+		this.hash = hash;
 	}
 
 	public K getKey() {
@@ -25,6 +27,10 @@ public class JedisEntry<K extends JedisObject,V extends JedisObject>{
 		V result = this.value;
 		this.value = value;
 		return result;
+	}
+	
+	public int getHash() {
+		return hash;
 	}
 
 }

@@ -6,28 +6,38 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
-	private List<List<JedisEntry<K, V>>> table;
+	private List<JedisEntry<K, V>>[] table;
+	private static final int DEFAULT_LENGTH = 16; 
+	private static final int MAX_LENGTH = 1<<30;
 	private int length = 16;
 	private int lengthMask;
 	private int used;
-
-	public JedisHashTable() {
-		// TODO Auto-generated constructor stub
-		table = new ArrayList<>(length);
-		for(int i = 0; i < length;++i){
-			table.add(new LinkedList<>());
+	private static double MAX_LOAD_FACTOR = 0.75;
+	
+	final int hash(K key) {
+        int h;
+        return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
+    }
+	
+	final int getSizeFor(int capacity){
+		int size = MAX_LENGTH;
+		while(size>>1 > capacity){
+			size >>= 1;
 		}
-		lengthMask = length - 1;
+		return size;
 	}
 	
+	public JedisHashTable() {
+		// TODO Auto-generated constructor stub
+		this(DEFAULT_LENGTH);
+	}
+	
+	@SuppressWarnings({"rawtypes","unchecked"})
 	public JedisHashTable(int capacity) {
 		// TODO Auto-generated constructor stub
-		if(capacity < 16) capacity = 16;
-		this.length = capacity;
-		table = new ArrayList<>(length);
-		for(int i = 0; i < length;++i){
-			table.add(new LinkedList<>());
-		}
+		if(capacity < DEFAULT_LENGTH) capacity = DEFAULT_LENGTH;
+		this.length = getSizeFor(capacity);
+		table = (List<JedisEntry<K, V>>[]) new LinkedList[length];
 		lengthMask = length - 1;
 	}
 	
@@ -39,28 +49,28 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 		return used;
 	}
 	
-	public List<JedisEntry<K, V>> getEntry(int index){
-		return table.get(index);
-	}
-	
 	public V add(JedisEntry<K, V> entry){
 		V oldValue = null;
 		if(entry != null){
 			K key = entry.getKey();
 			V value = entry.getValue();
-			int hash = key.hashCode() & lengthMask;
-			List<JedisEntry<K, V>> candidates = table.get(hash);
+			int hash = entry.getHash() & lengthMask;
+			List<JedisEntry<K, V>> candidates = table[hash];
 			boolean isContain = false;
-			for(JedisEntry<K, V> e : candidates){
-				if(e.getKey().equals(key)){
-					oldValue = e.getValue();
-					e.setValue(value);
-					isContain = true;
-					break;
+			if(candidates == null){
+				table[hash] = new LinkedList<>();
+			}else{
+				for(JedisEntry<K, V> e : candidates){
+					if(e.getKey().equals(key)){
+						oldValue = e.getValue();
+						e.setValue(value);
+						isContain = true;
+						break;
+					}
 				}
 			}
 			if(!isContain){
-				candidates.add(0,entry);
+				table[hash].add(entry);
 				++used;
 			}
 		}
@@ -72,10 +82,12 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 	}
 
 	public V get(K key) {
-		int hash = key.hashCode() & lengthMask;
-		List<JedisEntry<K, V>> candidates = table.get(hash);
-		for(JedisEntry<K, V> entry : candidates){
-			if(entry.getKey().equals(key)) return entry.getValue();
+		int hash = hash(key) & lengthMask;
+		List<JedisEntry<K, V>> candidates = table[hash];
+		if(candidates != null){
+			for(JedisEntry<K, V> entry : candidates){
+				if(entry.getKey().equals(key)) return entry.getValue();
+			}
 		}
 		return null;
 	}
@@ -83,8 +95,8 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 	//TODO: this can be optimized by user self-defined double-linked list 
 	//now it's O(2n) complexity
 	public V remove(K key) {
-		int hash = key.hashCode() & lengthMask;
-		List<JedisEntry<K, V>> candidates = table.get(hash);
+		int hash = hash(key) & lengthMask;
+		List<JedisEntry<K, V>> candidates = table[hash];
 		int index = -1,i = 0;
 		for(JedisEntry<K, V> entry : candidates){
 			if(entry.getKey().equals(key)){
@@ -102,8 +114,9 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 	}
 
 	public V put(K key, V value) {
-		int hash = key.hashCode() & lengthMask;
-		List<JedisEntry<K, V>> candidates = table.get(hash);
+		int keyHash = hash(key);
+		int hash = keyHash & lengthMask;
+		List<JedisEntry<K, V>> candidates = table[hash];
 		V oldValue = null;
 		boolean isContain = false;
 		for(JedisEntry<K, V> entry : candidates){
@@ -115,15 +128,15 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 			}
 		}
 		if(!isContain){
-			candidates.add(0,new JedisEntry<K,V>(key,value));
+			candidates.add(0,new JedisEntry<K,V>(key,value,keyHash));
 			++used;
 		}
 		return oldValue;
 	}
 
 	public boolean containsKey(K key) {
-		int hash = key.hashCode() & lengthMask;
-		List<JedisEntry<K, V>> candidates = table.get(hash);
+		int hash = hash(key) & lengthMask;
+		List<JedisEntry<K, V>> candidates = table[hash];
 		boolean isContain = false;
 		for(JedisEntry<K, V> entry : candidates){
 			if(entry.getKey().equals(key)){
@@ -137,11 +150,12 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 	public JedisHashTable<K, V> copy(){
 		JedisHashTable<K, V> ht = new JedisHashTable<>(length);
 		for(int i = 0; i < length;++i){
-			List<JedisEntry<K, V>> candidates = table.get(i);
+			List<JedisEntry<K, V>> candidates = table[i];
 			for(JedisEntry<K, V> entry : candidates){
 				K key = (K)entry.getKey().deepCopy();
 				V value = (V)entry.getValue().deepCopy();
-				ht.getEntry(i).add(0,new JedisEntry<K, V>(key, value));
+				int hash = entry.getHash();
+				ht.table[i].add(0,new JedisEntry<K, V>(key, value,hash));
 			}
 		}
 		ht.used = this.used;
@@ -149,44 +163,24 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 		return ht;
 	}
 	
-	public List<JedisEntry<K, V>> entryList() {
-		List<JedisEntry<K, V>> entries = new ArrayList<>(used);
-		for(List<JedisEntry<K, V>> list : table){
-			for(JedisEntry<K, V> entry : list){
-				entries.add(entry);
-			}
-		}
-		return entries;
-	}
-	
-	public List<K> keyList() {
-		List<K> entries = new ArrayList<>(used);
-		for(List<JedisEntry<K, V>> list : table){
-			for(JedisEntry<K, V> entry : list){
-				entries.add(entry.getKey());
-			}
-		}
-		return entries;
-	}
-	
 	public Iterator<JedisEntry<K, V>> iterator(){
 		return new Iterator<JedisEntry<K,V>>() {
-			Iterator<List<JedisEntry<K, V>>> level0Iterator = table.iterator();
-			Iterator<JedisEntry<K, V>> level1Iterator = level0Iterator.next().iterator();
+			int i = 0;
+			Iterator<JedisEntry<K, V>> iterator = table[0].iterator();
 			
 			@Override
 			public boolean hasNext() {
 				// TODO Auto-generated method stub
-				while(!level1Iterator.hasNext() && level0Iterator.hasNext()){
-					level1Iterator = level0Iterator.next().iterator();
+				while(!iterator.hasNext() && i < length){
+					iterator = table[i].iterator();
 				}
-				return level1Iterator.hasNext();
+				return iterator.hasNext();
 			}
 
 			@Override
 			public JedisEntry<K, V> next() {
 				// TODO Auto-generated method stub
-				return level1Iterator.next();
+				return iterator.next();
 			}
 		};
 	}

@@ -16,8 +16,8 @@ public class JedisEntryTest {
 		JedisObject value = new Sds("Hello World");
 		Sds key1 = new Sds("another msg");
 		JedisObject value1 = new Sds("Another world");
-		JedisEntry<Sds, JedisObject> entry = new JedisEntry<>(key, value),
-				entry2 = new JedisEntry<Sds, JedisObject>(key1, value1);
+		JedisEntry<Sds, JedisObject> entry = new JedisEntry<>(key, value,key.hashCode()),
+				entry2 = new JedisEntry<Sds, JedisObject>(key1, value1,key.hashCode());
 		assertEquals(key.toString(), entry.getKey().toString());
 		assertEquals(value.toString(), entry.getValue().toString());
 		assertEquals(key1, entry2.getKey());

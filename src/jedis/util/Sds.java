@@ -207,7 +207,7 @@ public class Sds implements JedisObject{
 	}
 	
 	@Override
-	public Sds deepClone(){
+	public Sds deepCopy(){
 		Sds sds = new Sds(this.used);;
 		sds.copyFrom(this);
 		return sds;

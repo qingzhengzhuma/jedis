@@ -2,6 +2,8 @@ package jedis.server;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.Map.Entry;
 
 import jedis.util.JedisObject;
 import jedis.util.Sds;
@@ -35,7 +37,11 @@ public class JedisDB{
 	
 	public JedisDB copy(){
 		JedisDB db = new JedisDB();
-		//db.dict = dict.copy();
+		for(Entry<Sds, JedisObject> entry : dict.entrySet()){
+			Sds key = entry.getKey().deepCopy();
+			JedisObject value = entry.getValue().deepCopy();
+			db.set(key, value);
+		}
 		return db;
 	}
 }

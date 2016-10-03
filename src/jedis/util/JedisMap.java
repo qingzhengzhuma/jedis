@@ -30,6 +30,7 @@ public class JedisMap<K extends JedisObject,V extends JedisObject>{
 	}
 	
 	public V put(K key,V value){
+		resize();
 		if(ht2 != null){
 			V oldValue = ht1.remove(key);
 			V old1 = ht2.put(key, value);
@@ -63,23 +64,22 @@ public class JedisMap<K extends JedisObject,V extends JedisObject>{
 	}
 	
 	public void resize(){
+		if(ht1.getLength() <= 16) return;
 		int newSize = 0;
 		if(ht1.factor() > 0.75){
 			if(ht1.getLength() == Integer.MAX_VALUE) return;
 			newSize = ht1.getLength() * 2;
 		}else if(ht1.factor() < 0.1){
-			newSize = 1;
+			newSize = 16;
 			while(newSize <= ht1.getUsed()){
 				newSize <<= 1;
 			}
 			newSize = Math.max(newSize, 16);
 		}
 		ht2 = new JedisHashTable<>(newSize);
-		for(int i = 0; i < ht1.getLength();++i){
-			List<JedisEntry<K, V>> candidates = ht1.getEntry(i);
-			for(JedisEntry<K, V> entry : candidates){
-				ht2.add(entry);
-			}
+		Iterator<JedisEntry<K, V>> iterator =  ht1.iterator();
+		while(iterator.hasNext()){
+			ht2.add(iterator.next());
 		}
 		ht1 = ht2;
 		ht2 = null;
@@ -89,13 +89,6 @@ public class JedisMap<K extends JedisObject,V extends JedisObject>{
 		
 	}
 	
-	public List<JedisEntry<K, V>> entryList(){
-		return ht1.entryList();
-	}
-	
-	public List<K> keyList(){
-		return ht1.keyList();
-	}
 	
 	public Iterator<JedisEntry<K, V>> iterator(){
 		return ht1.iterator();

@@ -14,7 +14,7 @@ import jedis.util.Sds;
 public class JedisHashTableTest {
 
 	
-	@Test
+	/*@Test
 	public void testAdd() {
 		JedisHashTable<Sds, JedisObject> hashTable = new JedisHashTable<>();
 		Sds key = new Sds("msg");
@@ -27,7 +27,7 @@ public class JedisHashTableTest {
 		assertEquals(value1, hashTable.get(key));
 		assertEquals(null, hashTable.add(null));
 		assertEquals(0.0625, hashTable.factor(),1e-15);
-	}
+	}*/
 	
 	@Test
 	public void testFactor() {

@@ -5,15 +5,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Date;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 
 import jedis.util.JedisConfigration;
-import jedis.util.JedisEntry;
 import jedis.util.JedisObject;
 import jedis.util.Sds;
 
@@ -23,7 +20,7 @@ public class RDB {
 		RandomAccessFile rdbFile;
 		rdbFile = new RandomAccessFile(rdbFilePath, "r");
 		dbNum = rdbFile.readInt();
-		Server.inUseDatabases = new JedisDB[dbNum];
+		Server.initDatabases(dbNum);
 		JedisDB[] databases = Server.inUseDatabases;
 		SdsReaderWriter sdsReaderWriter = new SdsReaderWriter();
 		for (int i = 0; i < dbNum; ++i) {
