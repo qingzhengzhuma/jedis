@@ -8,7 +8,6 @@ import java.nio.channels.SocketChannel;
 import java.util.Scanner;
 
 import jedis.util.CommandLine;
-import jedis.util.MessageConstant;
 
 public class JedisWorkbench {
 	private SocketChannel clientSocket;
@@ -104,7 +103,7 @@ public class JedisWorkbench {
 					String command = cl.getNormalizedCmd();
 					if (command.equals("quit") || command.equals("exit")) {
 						clientSocket.close();
-						System.out.println(MessageConstant.BYE);
+						System.out.println("Bye");
 						break;
 					}else {
 						command = cl.getNormalizedCmdLine();
@@ -114,7 +113,7 @@ public class JedisWorkbench {
 						}
 						ByteBuffer readBuffer = ByteBuffer.allocate(1024);
 						if (clientSocket.read(readBuffer) == -1) {
-							System.out.println(MessageConstant.CONNECTION_CLOSED);
+							System.out.println("Connection closed!");
 							System.exit(-1);
 						}
 						readBuffer.flip();
@@ -126,7 +125,7 @@ public class JedisWorkbench {
 			scanner.close();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
-			System.out.println(MessageConstant.BYE);
+			System.out.println("Bye");
 		}
 	}
 
