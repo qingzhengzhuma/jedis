@@ -147,10 +147,10 @@ public class Server {
 		if (cl.parse(new String(data))) {
 			String command = cl.getNormalizedCmd();
 			int argc = cl.getArgc();
-			if (JedisConfigration.verifyCommand(command, argc) == true) {
+			if (CommandHandler.verifyCommand(command, argc) == true) {
 				String address = getRemoteAddress(clientChannel);
 				try {
-					CommandHandler handler = JedisConfigration.getHandler(command);
+					CommandHandler handler = CommandHandler.getHandler(command);
 					JedisObject object = handler.execute(clients.get(address), cl);
 					if (object == null) {
 						object = new Sds("(nil)");

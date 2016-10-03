@@ -6,8 +6,9 @@ import static org.junit.Assert.assertNotEquals;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import jedis.util.JedisConfigration;
-import jedis.util.CommandRule;
+import jedis.server.JedisConfigration;
+import jedis.server.CommandHandler;
+import jedis.server.CommandRule;
 
 public class CommandRuleTest {
 	
@@ -15,7 +16,7 @@ public class CommandRuleTest {
 	
 	@BeforeClass
 	public static void setUp(){
-		commandRules = JedisConfigration.getCommandRules();
+		commandRules = CommandHandler.getCommandRules();
 	}
 	@Test
 	public void testCommandRule() {
@@ -43,7 +44,7 @@ public class CommandRuleTest {
 	public void testGetHandler() {
 		int i = 0;
 		for(CommandRule rule : commandRules){
-			assertEquals(JedisConfigration.getCommandRules()[i++].getHandler(), rule.getHandler());
+			assertEquals(CommandHandler.getCommandRules()[i++].getHandler(), rule.getHandler());
 		}
 	}
 }

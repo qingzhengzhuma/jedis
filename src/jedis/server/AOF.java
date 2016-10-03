@@ -122,7 +122,7 @@ public class AOF {
 			fakeClient.setCurrentDB(dbIndex);
 			CommandLine cl = new CommandLine();
 			cl.parse(cmd);
-			CommandHandler handler = JedisConfigration.getHandler(cl.getCommand());
+			CommandHandler handler = CommandHandler.getHandler(cl.getCommand());
 			handler.execute(fakeClient, cl);
 			length -= file.getFilePointer();
 		}
