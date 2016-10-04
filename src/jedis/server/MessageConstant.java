@@ -1,6 +1,5 @@
 package jedis.server;
 
-import jedis.util.JedisObject;
 import jedis.util.Sds;
 
 public final class MessageConstant {

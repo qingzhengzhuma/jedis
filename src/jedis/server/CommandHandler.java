@@ -1,5 +1,6 @@
 package jedis.server;
 
+import java.util.LinkedList;
 import java.util.List;
 
 import jedis.util.CommandLine;
@@ -18,7 +19,9 @@ abstract public class CommandHandler {
 			new CommandRule("expire", 2, 2, new ExpireHandler()),
 			new CommandRule("watch", 1, Integer.MAX_VALUE, new WatchHandler()),
 			new CommandRule("unwatch", 0, 0, new UnwatchHandler()), new CommandRule("multi", 0, 0, multiHandler),
-			new CommandRule("exec", 0, 0, execHandler) };
+			new CommandRule("exec", 0, 0, execHandler) ,
+			new CommandRule("subscribe", 1, Integer.MAX_VALUE, new SubscribeHandler()),
+			new CommandRule("publish", 2, 2, new PublishHandler())};
 
 	private static CommandHandler unsupportCommandHandler = new CommandHandler() {
 
@@ -279,6 +282,31 @@ class PingHandler extends CommandHandler {
 	}
 }
 
+class PublishHandler extends CommandHandler{
+
+	@Override
+	protected JedisObject execute(JedisClient client, CommandLine cl) throws UnsupportedOperationException {
+		// TODO Auto-generated method stub
+		String channel = cl.getArg(0);
+		String message = cl.getArg(1);
+		List<JedisClient> clients = Server.subscribedChannels.get(new Sds(channel));
+		int count = 0;
+		if(clients != null){
+			Sds response = new Sds("1) \"message\"\n");
+			response.append("2) \"");
+			response.append(channel);
+			response.append("\"\n3) ");
+			response.append(message);
+			response.append("\n");
+			for(JedisClient c : clients){
+				c.sendResponse(response.getBytes());
+				++count;
+			}
+		}
+		return new Sds(Integer.toString(count));
+	}	
+}
+
 class MultiHandler extends CommandHandler {
 
 	@Override
@@ -343,6 +371,25 @@ class SetHandler extends CommandHandler {
 			Server.aof.put(cl, db);
 		}
 		touchWatchKey(db, key);
+		return MessageConstant.OK;
+	}
+}
+
+class SubscribeHandler extends CommandHandler{
+
+	@Override
+	protected JedisObject execute(JedisClient client, CommandLine cl) throws UnsupportedOperationException {
+		// TODO Auto-generated method stub
+		int channelCount = cl.getArgc();
+		for(int i = 0; i < channelCount;++i){
+			Sds channel = new Sds(cl.getArg(i));
+			List<JedisClient> clients = Server.subscribedChannels.get(channel);
+			if(clients == null){
+				clients = new LinkedList<>();
+				Server.subscribedChannels.put(channel, clients);
+			}
+			clients.add(client);
+		}
 		return MessageConstant.OK;
 	}
 }

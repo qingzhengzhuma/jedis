@@ -1,5 +1,7 @@
 package jedis.server;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -62,6 +64,21 @@ public class JedisClient{
 			watchedKeys.add(key);
 			clns.add(this);
 		}
+	}
+	
+	boolean sendResponse(byte[] result) {
+		int length = result.length;
+		ByteBuffer buffer = ByteBuffer.allocate(length);
+		buffer.put(result);
+		buffer.flip();
+		while (buffer.hasRemaining()) {
+			try {
+				channel.write(buffer);
+			} catch (IOException e) {
+				return false;
+			}
+		}
+		return true;
 	}
 	
 	@Override

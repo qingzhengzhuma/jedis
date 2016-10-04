@@ -39,11 +39,14 @@ public class Server {
 	public static long cronNums = 0;
 	List<TimeEvent> timeEvents;
 	long lastSyncTime = System.currentTimeMillis();
-	public static final long aofFileSizeThreshold = 1024 * 1024 * 256; // 256MB
+	static final long aofFileSizeThreshold = 1024 * 1024 * 256; // 256MB
+	static Map<Sds, List<JedisClient>> subscribedChannels;
 
 	private Server() {
+		clients = new HashMap<>();
 		timeEvents = new LinkedList<>();
 		timeEvents.add(new ServerTimeEvent(System.currentTimeMillis()));
+		subscribedChannels = new HashMap<>();
 	}
 
 	private TimeEvent getNearestTimeEvent() {
@@ -75,7 +78,6 @@ public class Server {
 	public boolean init() {
 		try {
 			loadConfigration();
-			clients = new HashMap<>();
 			serverSelector = Selector.open();
 			serverSocketChannel = ServerSocketChannel.open();
 			serverSocketChannel.socket().bind(new InetSocketAddress(LISTEN_PORT));
@@ -133,29 +135,6 @@ public class Server {
 		}
 	}
 
-	private byte[] processCommand(SocketChannel clientChannel, byte[] data) {
-		String address = getRemoteAddress(clientChannel);
-		JedisClient client = clients.get(address);
-		return CommandHandler.executeCommand(client, data).getBytes();
-	}
-
-	private boolean sendResponse(SocketChannel clientChannel, byte[] result) {
-		int length = result.length;
-		ByteBuffer buffer = ByteBuffer.allocate(length);
-		buffer.put(result);
-		buffer.flip();
-		while (buffer.hasRemaining()) {
-			try {
-				clientChannel.write(buffer);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				System.out.println(e.getMessage());
-				return false;
-			}
-		}
-		return true;
-	}
-
 	private void handleCommand(SelectionKey key) {
 		SocketChannel clientChannel = (SocketChannel) key.channel();
 		ByteBuffer buffer = ByteBuffer.allocate(1024);
@@ -165,8 +144,10 @@ public class Server {
 				removeClient(key);
 			} else {
 				buffer.flip();
-				byte[] result = processCommand(clientChannel, buffer.array());
-				if (sendResponse(clientChannel, result) == false) {
+				String address = getRemoteAddress(clientChannel);
+				JedisClient client = clients.get(address);
+				byte[] result = CommandHandler.executeCommand(client, buffer.array()).getBytes();
+				if (client.sendResponse(result) == false) {
 					removeClient(key);
 				}
 			}
