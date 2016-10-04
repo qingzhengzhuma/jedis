@@ -1,6 +1,5 @@
 package jedis.server;
 
-import java.util.LinkedList;
 import java.util.List;
 
 import jedis.util.CommandLine;
@@ -8,8 +7,8 @@ import jedis.util.JedisObject;
 import jedis.util.Sds;
 
 abstract public class CommandHandler {
-	private static final CommandHandler multiHandler = new MultiHandler() ;
-	private static final CommandHandler execHandler = new ExecHandler();
+	public static final CommandHandler multiHandler = new MultiHandler();
+	public static final CommandHandler execHandler = new ExecHandler();
 	private static final CommandRule[] commandRules = { new CommandRule("ping", 0, 0, new PingHandler()),
 			new CommandRule("select", 1, 1, new SelectHandler()), new CommandRule("set", 2, 2, new SetHandler()),
 			new CommandRule("get", 1, 1, new GetHandler()), new CommandRule("exists", 1, 1, new ExistsHandler()),
@@ -18,9 +17,8 @@ abstract public class CommandHandler {
 			new CommandRule("save", 0, 0, new SaveHandler()), new CommandRule("bgsave", 0, 0, new BgSaveHandler()),
 			new CommandRule("expire", 2, 2, new ExpireHandler()),
 			new CommandRule("watch", 1, Integer.MAX_VALUE, new WatchHandler()),
-			new CommandRule("unwatch", 0, 0, new UnwatchHandler()),
-			new CommandRule("multi", 0, 0, multiHandler), 
-			new CommandRule("exec", 0, 0, execHandler)};
+			new CommandRule("unwatch", 0, 0, new UnwatchHandler()), new CommandRule("multi", 0, 0, multiHandler),
+			new CommandRule("exec", 0, 0, execHandler) };
 
 	private static CommandHandler unsupportCommandHandler = new CommandHandler() {
 
@@ -31,7 +29,7 @@ abstract public class CommandHandler {
 		}
 	};
 
-	protected void touchExpiredKey(JedisDB db, Sds key) {
+	protected void touchWatchKey(JedisDB db, Sds key) {
 		List<JedisClient> clients = db.watchedKeys.get(key);
 		if (clients != null) {
 			for (JedisClient c : clients) {
@@ -47,18 +45,11 @@ abstract public class CommandHandler {
 			int argc = cl.getArgc();
 			if (CommandHandler.verifyCommand(command, argc) == true) {
 				try {
-					CommandHandler handler = CommandHandler.getHandler(command);
-					if(client.multiState == MultiState.NONE || handler == execHandler){
-						JedisObject object = handler.execute(client, cl);
-						if (object == null)
-							object = MessageConstant.NIL;
-						return object;
-					}else if(handler == multiHandler){
-						return MessageConstant.MULTI_CANNOT_BE_NEST;
-					}else {
-						client.multiCommandBuf.offer(cl);
-						return MessageConstant.QUEUED;
-					}
+					CommandHandler handler = CommandHandler.getHandler(client, command);
+					JedisObject object = handler.execute(client, cl);
+					if (object == null)
+						object = MessageConstant.NIL;
+					return object;
 				} catch (UnsupportedOperationException e) {
 					// TODO: handle exception
 					return MessageConstant.NOT_SUPPORTED_OPERATION;
@@ -71,7 +62,11 @@ abstract public class CommandHandler {
 		return MessageConstant.ILLEGAL_COMMAND;
 	}
 
-	public static CommandHandler getHandler(String cmd) {
+	public static CommandHandler getHandler(JedisClient client, String cmd) {
+		if (client.multiState != MultiState.NONE) {
+			if (cmd.equals("exec")) return execHandler;	
+			return multiHandler;
+		}
 		for (CommandRule rule : commandRules) {
 			if (rule.getCommand().equals(cmd)) {
 				return rule.getHandler();
@@ -114,7 +109,7 @@ class AppendHandler extends CommandHandler {
 			value = new Sds(cl.getArg(1));
 		}
 		db.set(key, value);
-		touchExpiredKey(db, key);
+		touchWatchKey(db, key);
 		if (Server.aofState == AofState.AOF_ON) {
 			Server.aof.put(cl, db);
 		}
@@ -160,7 +155,7 @@ class DeleteHandle extends CommandHandler {
 			if (db.remove(key)) {
 				++deletedCount;
 			}
-			touchExpiredKey(db, key);
+			touchWatchKey(db, key);
 		}
 		if (Server.aofState == AofState.AOF_ON) {
 			Server.aof.put(cl, db);
@@ -173,33 +168,39 @@ class DeleteHandle extends CommandHandler {
 
 }
 
-class ExecHandler extends CommandHandler{
+class ExecHandler extends CommandHandler {
 
 	@Override
 	protected JedisObject execute(JedisClient client, CommandLine cl) throws UnsupportedOperationException {
 		// TODO Auto-generated method stub
-		if(client.multiState == MultiState.NONE){
+		if (client.multiState == MultiState.NONE) {
 			return MessageConstant.EXEC_WITHOUT_MULTI;
 		}
-		if(client.multiState == MultiState.ERROR_HAPPENED){
+		if (client.multiState == MultiState.ERROR_HAPPENED) {
 			client.multiState = MultiState.NONE;
-			client.multiCommandBuf.clear();
+			client.clearWatch();
 			return MessageConstant.ERROR_HAPPED_IN_TRANSACTIOIN;
 		}
 		client.multiState = MultiState.NONE;
-		if(client.multiCommandBuf.size() > 0){
-			Sds result = new Sds();
+		Sds result = new Sds(MessageConstant.MULTI_COMMAND_EMPTY);
+		if (client.multiCommandBuf.size() > 0) {
 			int i = 1;
-			while(!client.multiCommandBuf.isEmpty()){
+			result = new Sds();
+			while (!client.multiCommandBuf.isEmpty()) {
 				CommandLine c = client.multiCommandBuf.poll();
 				String cmd = c.getNormalizedCmd();
-				CommandHandler handler = getHandler(cmd);
-				try{
+				if(c.getArgc() > 0 && client.dirtyCas == true && 
+				   client.watchedKeys.contains(new Sds(c.getArg(0)))){
+					result = MessageConstant.NIL;
+					break;
+				}
+				CommandHandler handler = getHandler(client, cmd);
+				try {
 					result.append(Integer.toString(i));
 					result.append(")  ");
 					byte[] res = handler.execute(client, c).getBytes();
 					result.append(res);
-				}catch (Exception e) {
+				} catch (Exception e) {
 					// TODO: handle exception
 					e.printStackTrace();
 					result.append("ERROR");
@@ -207,11 +208,12 @@ class ExecHandler extends CommandHandler{
 				result.append("\r\n");
 				++i;
 			}
-			return result;
 		}
-		return MessageConstant.MULTI_COMMAND_EMPTY;
+		client.multiCommandBuf.clear();
+		
+		client.clearWatch();
+		return result;
 	}
-	
 }
 
 class ExistsHandler extends CommandHandler {
@@ -264,7 +266,8 @@ class GetHandler extends CommandHandler {
 		Sds key = new Sds(cl.getArg(0));
 		db.removeIfExpired(key);
 		JedisObject value = db.get(key);
-		if(value == null) value = MessageConstant.NIL;
+		if (value == null)
+			value = MessageConstant.NIL;
 		return value;
 	}
 
@@ -281,11 +284,14 @@ class MultiHandler extends CommandHandler {
 	@Override
 	protected JedisObject execute(JedisClient client, CommandLine cl) throws UnsupportedOperationException {
 		// TODO Auto-generated method stub
-		if(client.multiState == MultiState.NONE){
+		if (client.multiState == MultiState.NONE) {
 			client.multiState = MultiState.WAIT_EXEC;
 			return MessageConstant.OK;
+		} else if (cl.getNormalizedCmd().equals("multi")) {
+			return MessageConstant.MULTI_CANNOT_BE_NEST;
 		}
-		return MessageConstant.MULTI_CANNOT_BE_NEST;
+		client.multiCommandBuf.offer(cl);
+		return MessageConstant.QUEUED;
 	}
 }
 
@@ -336,7 +342,7 @@ class SetHandler extends CommandHandler {
 		if (Server.aofState == AofState.AOF_ON) {
 			Server.aof.put(cl, db);
 		}
-		touchExpiredKey(db, key);
+		touchWatchKey(db, key);
 		return MessageConstant.OK;
 	}
 }
@@ -362,23 +368,12 @@ class WatchHandler extends CommandHandler {
 	@Override
 	protected JedisObject execute(JedisClient client, CommandLine cl) throws UnsupportedOperationException {
 		// TODO Auto-generated method stub
-		int argc = cl.getArgc();
-		JedisDB db = client.db;
-		for (int i = 0; i < argc; ++i) {
-			Sds key = new Sds(cl.getArg(i));
-			db.removeIfExpired(key);
-			List<JedisClient> clns = db.watchedKeys.get(key);
-			if (clns == null) {
-				clns = new LinkedList<>();
-				db.watchedKeys.put(key, clns);
-			}
-			if (client.watchedKeys.add(key)) {
-				clns.add(client);
-			}
+		if (client.multiState != MultiState.NONE) {
+			return MessageConstant.WATCH_INSIDE_MULTI_NOT_ALLOWED;
 		}
+		client.watch(cl);
 		return MessageConstant.OK;
 	}
-
 }
 
 class UnwatchHandler extends CommandHandler {
@@ -386,16 +381,7 @@ class UnwatchHandler extends CommandHandler {
 	@Override
 	protected JedisObject execute(JedisClient client, CommandLine cl) throws UnsupportedOperationException {
 		// TODO Auto-generated method stub
-		JedisDB db = client.db;
-		for (Sds key : client.watchedKeys) {
-			List<JedisClient> clients = db.watchedKeys.get(key);
-			if (clients != null) {
-				clients.remove(client);
-			}
-		}
-		client.watchedKeys.clear();
-		client.dirtyCas = false;
-		return null;
+		client.clearWatch();
+		return MessageConstant.OK;
 	}
-
 }

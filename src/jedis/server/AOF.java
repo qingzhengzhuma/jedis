@@ -122,7 +122,7 @@ public class AOF {
 			fakeClient.db = Server.inUseDatabases[dbIndex];
 			CommandLine cl = new CommandLine();
 			cl.parse(cmd);
-			CommandHandler handler = CommandHandler.getHandler(cl.getCommand());
+			CommandHandler handler = CommandHandler.getHandler(fakeClient,cl.getCommand());
 			handler.execute(fakeClient, cl);
 			length -= file.getFilePointer();
 		}

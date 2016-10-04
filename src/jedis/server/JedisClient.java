@@ -3,6 +3,7 @@ package jedis.server;
 import java.nio.channels.SocketChannel;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 
@@ -34,6 +35,33 @@ public class JedisClient{
 		if(!(o instanceof JedisClient)) return false;
 		JedisClient client = (JedisClient)o;
 		return client.address.equals(this.address);
+	}
+	
+	public void clearWatch(){
+		for(Sds key : watchedKeys){
+			List<JedisClient> clients = db.watchedKeys.get(key);
+			if(clients != null){
+				clients.remove(this);
+			}
+		}
+		watchedKeys.clear();
+		dirtyCas = false;
+	}
+	
+	public void watch(CommandLine cl){
+		int argc = cl.getArgc();
+		for (int i = 0; i < argc; ++i) {
+			Sds key = new Sds(cl.getArg(i));
+			db.removeIfExpired(key);
+			if(watchedKeys.contains(key)) continue;
+			List<JedisClient> clns = db.watchedKeys.get(key);
+			if (clns == null) {
+				clns = new LinkedList<>();
+				db.watchedKeys.put(key, clns);
+			}
+			watchedKeys.add(key);
+			clns.add(this);
+		}
 	}
 	
 	@Override
