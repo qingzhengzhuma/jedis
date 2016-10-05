@@ -11,8 +11,6 @@ import java.util.Iterator;
 import java.util.Scanner;
 import java.util.Set;
 
-import jedis.util.CommandLine;
-
 public class JedisWorkbench {
 	private SocketChannel clientSocket;
 	private String serverIP;
@@ -95,6 +93,88 @@ public class JedisWorkbench {
 		}
 	}
 
+	public void listen() throws IOException {
+		ByteBuffer readBuffer = ByteBuffer.allocate(1024);
+		Selector selector = Selector.open();
+		clientSocket.configureBlocking(false);
+		clientSocket.register(selector, SelectionKey.OP_READ);
+		boolean isStop = false;
+		while (!isStop) {
+			selector.select();
+			Set<SelectionKey> keys = selector.selectedKeys();
+			Iterator<SelectionKey> iterator = keys.iterator();
+			while (iterator.hasNext()) {
+				SelectionKey key = iterator.next();
+				if (key.isReadable()) {
+					int size = clientSocket.read(readBuffer);
+					if (size == -1) {
+						throw new IOException("Connection Closed");
+					}
+					readBuffer.flip();
+					String resp = new String(readBuffer.array()).trim();
+					System.out.println(resp);
+					readBuffer.clear();
+				}
+				iterator.remove();
+			}
+		}
+	}
+
+	void quit() throws IOException {
+		clientSocket.close();
+		System.out.println("Bye");
+		System.exit(-1);
+	}
+
+	String sendRequest(String commandline) throws IOException {
+		ByteBuffer writeBuffer = wrapCommandToBuffer(commandline);
+		while (writeBuffer.hasRemaining()) {
+			clientSocket.write(writeBuffer);
+		}
+		ByteBuffer readBuffer = ByteBuffer.allocate(1024);
+		if (clientSocket.read(readBuffer) == -1) {
+			throw new IOException();
+		}
+		readBuffer.flip();
+		return new String(readBuffer.array()).trim();
+	}
+
+	String parseCmd(String commandline) {
+		StringBuilder cmd = new StringBuilder();
+		int length = commandline == null ? 0 : (commandline = commandline.trim()).length();
+		if (length > 0) {
+			for (int i = 0; i < length; ++i) {
+				char c = commandline.charAt(i);
+				if (Character.isWhitespace(c))
+					break;
+				cmd.append(c);
+			}
+		}
+		return cmd.toString();
+	}
+	
+	String tryMonitor(String commandline) throws IOException{
+		String resp = sendRequest(commandline);
+		if(resp.equals("OK")){
+			listen();
+		}
+		return resp;
+	}
+	
+	String trySubscribe(String commandline) throws IOException{
+		String resp = sendRequest(commandline);
+		if(resp.equals("OK")){
+			System.out.println("monitoring...");
+			listen();
+		}
+		return resp;
+	}
+	
+	String tryPrompt(String commandline) throws IOException{
+		String resp = sendRequest(commandline);
+		return resp;
+	}
+
 	public void start() {
 		String promptSymbol = this.serverIP + ":" + this.serverPort + ">";
 		Scanner scanner = new Scanner(System.in);
@@ -102,59 +182,18 @@ public class JedisWorkbench {
 		try {
 			while (scanner.hasNext()) {
 				String line = scanner.nextLine();
-				CommandLine cl = new CommandLine();
-				if (cl.parse(line)) {
-					String cmd = cl.getNormalizedCmd();
-					if (cmd.equals("quit") || cmd.equals("exit")) {
-						clientSocket.close();
-						System.out.println("Bye");
-						break;
-					} else {
-						String commandLine = cl.getNormalizedCmdLine();
-						ByteBuffer writeBuffer = wrapCommandToBuffer(commandLine);
-						while (writeBuffer.hasRemaining()) {
-							clientSocket.write(writeBuffer);
-						}
-						ByteBuffer readBuffer = ByteBuffer.allocate(1024);
-						if (clientSocket.read(readBuffer) == -1) {
-							System.out.println("Connection closed!");
-							System.exit(-1);
-						}
-						readBuffer.flip();
-						String resp = new String(readBuffer.array()).trim();
-						if ((cmd.equals("subscribe") || cmd.equals("monitor"))
-								&& resp.equals("OK")) {
-							readBuffer.clear();
-							if(cmd.equals("monitor")) System.out.println(resp);
-							else System.out.println("Subscribing...");
-							Selector selector = Selector.open();
-							clientSocket.configureBlocking(false);
-							clientSocket.register(selector, SelectionKey.OP_READ);
-							boolean isStop = false;
-							while(!isStop){
-								selector.select();
-								Set<SelectionKey> keys = selector.selectedKeys();
-								Iterator<SelectionKey> iterator = keys.iterator();
-								while(iterator.hasNext()){
-									SelectionKey key = iterator.next();
-									if(key.isReadable()){
-										int size = clientSocket.read(readBuffer);
-										if(size == -1){
-											System.out.println("Connection closed!");
-											System.exit(-1);
-										}
-										readBuffer.flip();
-										resp = new String(readBuffer.array()).trim();
-										System.out.print(resp);
-										readBuffer.clear();
-									}
-									iterator.remove();
-								}
-							}
-						}
-						System.out.println(resp);
-					}
+				String cmd = parseCmd(line);
+				String resp = "";
+				if (cmd.equals("quit") || cmd.equals("exit")) {
+					quit();
+				}else if(cmd.equals("monitor")){
+					resp = tryMonitor(line);
+				}else if(cmd.equals("subscribe")){
+					resp = trySubscribe(line);
+				}else{
+					resp = tryPrompt(line);
 				}
+				System.out.println(resp);
 				System.out.print(promptSymbol);
 			}
 			scanner.close();
