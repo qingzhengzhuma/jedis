@@ -111,7 +111,10 @@ public class JedisWorkbench {
 						throw new IOException("Connection Closed");
 					}
 					readBuffer.flip();
-					String resp = new String(readBuffer.array()).trim();
+					int length = readBuffer.remaining();
+					byte[] result = new byte[length];
+					readBuffer.get(result);
+					String resp = new String(result).trim();
 					System.out.println(resp);
 					readBuffer.clear();
 				}

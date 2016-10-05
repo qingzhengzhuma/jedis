@@ -191,15 +191,7 @@ public class Server {
 				buffer.flip();
 				if(buffer.hasArray()){
 					byte[] data = buffer.array();
-					boolean state = executeCommand(client,data);
-					if(state == true){
-						for(JedisClient c : monitors){
-							c.pushResult(new Sds(data));
-							if(!c.sendResponse()){
-								removeClient(c);
-							}
-						}
-					}
+					executeCommand(client,data);
 					if (client.sendResponse() == false) {
 						removeClient(client);
 						System.out.println(client.address + " " + MessageConstant.CONNECTION_CLOSED);
