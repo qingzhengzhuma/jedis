@@ -2,6 +2,7 @@ package jedis.server;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -10,19 +11,21 @@ import java.util.Queue;
 import java.util.Set;
 
 import jedis.util.CommandLine;
+import jedis.util.JedisObject;
 import jedis.util.Sds;
 
 public class JedisClient{
 	String address;
+	SocketChannel channel;
 	JedisDB db;
 	boolean dirtyCas;
-	SocketChannel channel;
 	MultiState multiState;
 	Set<Sds> watchedKeys;
 	Set<Sds> subscriedChannel;
 	Queue<CommandLine> multiCommandBuf;
+	Queue<JedisObject> resultBuf;
 	
-	public JedisClient(String address,SocketChannel channel) {
+	JedisClient(String address,SocketChannel channel) {
 		this.address = address;
 		this.channel = channel;
 		this.db = Server.inUseDatabases[0];
@@ -31,6 +34,7 @@ public class JedisClient{
 		this.watchedKeys = new HashSet<>();
 		this.multiCommandBuf = new LinkedList<>();
 		this.subscriedChannel = new HashSet<>();
+		resultBuf = new LinkedList<>();
 	}
 	
 	@Override
@@ -41,7 +45,7 @@ public class JedisClient{
 		return client.address.equals(this.address);
 	}
 	
-	public void clearWatch(){
+	void clearWatch(){
 		for(Sds key : watchedKeys){
 			List<JedisClient> clients = db.watchedKeys.get(key);
 			if(clients != null){
@@ -52,7 +56,7 @@ public class JedisClient{
 		dirtyCas = false;
 	}
 	
-	public void watch(CommandLine cl){
+	void watch(CommandLine cl){
 		int argc = cl.getArgc();
 		for (int i = 0; i < argc; ++i) {
 			Sds key = new Sds(cl.getArg(i));
@@ -68,16 +72,23 @@ public class JedisClient{
 		}
 	}
 	
-	boolean sendResponse(byte[] result) {
-		int length = result.length;
-		ByteBuffer buffer = ByteBuffer.allocate(length);
-		buffer.put(result);
-		buffer.flip();
-		while (buffer.hasRemaining()) {
-			try {
-				channel.write(buffer);
-			} catch (IOException e) {
-				return false;
+	void pushResult(JedisObject result){
+		resultBuf.offer(result);
+	}
+	
+	boolean sendResponse() {
+		if(!resultBuf.isEmpty()){
+			byte[] result = resultBuf.poll().getBytes();
+			int length = result.length;
+			ByteBuffer buffer = ByteBuffer.allocate(length);
+			buffer.put(result);
+			buffer.flip();
+			while (buffer.hasRemaining()) {
+				try {
+					channel.write(buffer);
+				} catch (IOException e) {
+					return false;
+				}
 			}
 		}
 		return true;

@@ -21,7 +21,8 @@ abstract public class CommandHandler {
 			new CommandRule("unwatch", 0, 0, new UnwatchHandler()), new CommandRule("multi", 0, 0, multiHandler),
 			new CommandRule("exec", 0, 0, execHandler) ,
 			new CommandRule("subscribe", 1, Integer.MAX_VALUE, new SubscribeHandler()),
-			new CommandRule("publish", 2, 2, new PublishHandler())};
+			new CommandRule("publish", 2, 2, new PublishHandler()),
+			new CommandRule("monitor", 0, 0, new MonitorHandler())};
 
 	private static CommandHandler unsupportCommandHandler = new CommandHandler() {
 
@@ -41,8 +42,9 @@ abstract public class CommandHandler {
 		}
 	}
 
-	public static JedisObject executeCommand(JedisClient client, byte[] data) {
+	public static boolean executeCommand(JedisClient client, byte[] data) {
 		CommandLine cl = new CommandLine();
+		boolean state = false;
 		if (cl.parse(new String(data))) {
 			String command = cl.getNormalizedCmd();
 			int argc = cl.getArgc();
@@ -52,17 +54,20 @@ abstract public class CommandHandler {
 					JedisObject object = handler.execute(client, cl);
 					if (object == null)
 						object = MessageConstant.NIL;
-					return object;
+					state = true;
+					client.pushResult(object);
 				} catch (UnsupportedOperationException e) {
 					// TODO: handle exception
-					return MessageConstant.NOT_SUPPORTED_OPERATION;
+					client.pushResult(MessageConstant.NOT_SUPPORTED_OPERATION);
 				} catch (IllegalArgumentException e) {
 					// TODO: handle exception
-					return MessageConstant.ILLEGAL_ARGUMENT;
+					client.pushResult(MessageConstant.ILLEGAL_ARGUMENT);
 				}
 			}
+		}else{
+			client.pushResult(MessageConstant.ILLEGAL_COMMAND);
 		}
-		return MessageConstant.ILLEGAL_COMMAND;
+		return state;
 	}
 
 	public static CommandHandler getHandler(JedisClient client, String cmd) {
@@ -276,6 +281,17 @@ class GetHandler extends CommandHandler {
 
 }
 
+class MonitorHandler extends CommandHandler{
+
+	@Override
+	protected JedisObject execute(JedisClient client, CommandLine cl) throws UnsupportedOperationException {
+		// TODO Auto-generated method stub
+		Server.monitors.add(client);
+		return MessageConstant.OK;
+	}
+	
+}
+
 class PingHandler extends CommandHandler {
 	public JedisObject execute(JedisClient client, CommandLine cl) {
 		return MessageConstant.PONG;
@@ -299,7 +315,8 @@ class PublishHandler extends CommandHandler{
 			response.append(message);
 			response.append("\n");
 			for(JedisClient c : clients){
-				c.sendResponse(response.getBytes());
+				c.pushResult(response);
+				c.sendResponse();
 				++count;
 			}
 		}

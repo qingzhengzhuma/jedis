@@ -29,8 +29,6 @@ public class Server {
 	private boolean isStop = false;
 	private static int databaseNum = 16;
 	public static JedisDB[] inUseDatabases;
-	// public static JedisDB[] bufDatabases;
-	// public static JedisDB[] deletedDatabases;
 	public static RdbSaveThread rdbSaveThread;
 	public static AofSaveThread aofSaveThread;
 	public static AofState aofState = AofState.AOF_OFF;
@@ -43,6 +41,7 @@ public class Server {
 	static final long aofFileSizeThreshold = 1024 * 1024 * 256; // 256MB
 	static Map<Sds, List<JedisClient>> subscribedChannels;
 	static Set<JedisClient> monitors;
+
 	private Server() {
 		clients = new HashMap<>();
 		timeEvents = new LinkedList<>();
@@ -69,12 +68,12 @@ public class Server {
 		syncPolicy = SyncPolicy.EVERY_SECOND;
 	}
 
-	public static void initDatabases(int dbNum) {
+	static void initDatabases(int dbNum) {
 		inUseDatabases = new JedisDB[dbNum];
 		for (int i = 0; i < dbNum; ++i) {
 			inUseDatabases[i] = new JedisDB();
 		}
-		
+
 	}
 
 	public boolean init() {
@@ -103,36 +102,30 @@ public class Server {
 			e.printStackTrace();
 			System.exit(-1);
 		} catch (Exception e) {
-			// TODO: handle exception
 			e.printStackTrace();
 			System.exit(-1);
 		}
 		return true;
 	}
 
-	private void removeClient(SelectionKey key) {
-		if (key == null)
-			return;
-		key.cancel();
-		try {
-			SocketChannel clientChannel = (SocketChannel) key.channel();
-			if (clientChannel != null) {
-				String address = clientChannel.getRemoteAddress().toString();
-				JedisClient client = clients.remove(address);
-				if(client != null){
-					for(Sds channel : client.subscriedChannel){
+	private void removeClient(JedisClient client) {
+		if (client != null) {
+			try {
+				String address = client.address;
+				clients.remove(address);
+				if (client != null) {
+					for (Sds channel : client.subscriedChannel) {
 						List<JedisClient> clns = Server.subscribedChannels.get(channel);
-						if(clns != null){
+						if (clns != null) {
 							clns.remove(client);
 						}
 					}
 					monitors.remove(client);
 				}
-				clientChannel.close();
-				System.out.println(address + " " + MessageConstant.CONNECTION_CLOSED);
+				client.channel.close();
+			} catch (IOException e) {
+				e.printStackTrace();
 			}
-		} catch (IOException e) {
-			e.printStackTrace();
 		}
 	}
 
@@ -140,33 +133,46 @@ public class Server {
 		try {
 			return socketChannel.getRemoteAddress().toString();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 			return new String();
 		}
 	}
-
-	private void handleCommand(SelectionKey key) {
-		SocketChannel clientChannel = (SocketChannel) key.channel();
+    
+	private boolean handleCommand(JedisClient client) {
 		ByteBuffer buffer = ByteBuffer.allocate(1024);
 		try {
-			int size = clientChannel.read(buffer);
+			int size = client.channel.read(buffer);
 			if (size == -1) {
-				removeClient(key);
+				removeClient(client);
+				System.out.println(client.address + " " + MessageConstant.CONNECTION_CLOSED);
+				return false;
 			} else {
 				buffer.flip();
-				String address = getRemoteAddress(clientChannel);
-				JedisClient client = clients.get(address);
-				byte[] result = CommandHandler.executeCommand(client, buffer.array()).getBytes();
-				if (client.sendResponse(result) == false) {
-					removeClient(key);
+				if(buffer.hasArray()){
+					byte[] data = buffer.array();
+					boolean state = CommandHandler.executeCommand(client,data);
+					if(state == true){
+						for(JedisClient c : monitors){
+							c.pushResult(new Sds(data));
+							if(!c.sendResponse()){
+								removeClient(c);
+							}
+						}
+					}
+					if (client.sendResponse() == false) {
+						removeClient(client);
+						System.out.println(client.address + " " + MessageConstant.CONNECTION_CLOSED);
+						return false;
+					}
 				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
+			return false;
 		} finally {
 			buffer.clear();
 		}
+		return true;
 	}
 
 	private void loadDatabase() throws IOException {
@@ -187,7 +193,7 @@ public class Server {
 				socketChannel.configureBlocking(false);
 				socketChannel.register(serverSelector, SelectionKey.OP_READ);
 				String address = getRemoteAddress(socketChannel);
-				clients.put(address, new JedisClient(address,socketChannel));
+				clients.put(address, new JedisClient(address, socketChannel));
 				System.out.println("Received Connection From " + address);
 			} else {
 				System.out.println("Connection receive, but failed to Connect.");
@@ -206,7 +212,12 @@ public class Server {
 			if (key.isAcceptable()) {
 				handleAcception(key);
 			} else if (key.isReadable()) {
-				handleCommand(key);
+				SocketChannel clientChannel = (SocketChannel) key.channel();
+				String address = getRemoteAddress(clientChannel);
+				JedisClient client = clients.get(address);
+				if(!handleCommand(client)){
+					key.cancel();
+				}
 			}
 		}
 		iterator.remove();
@@ -230,7 +241,8 @@ public class Server {
 				TimeEvent event = getNearestTimeEvent();
 				long latestExpiredTime = event == null ? Long.MAX_VALUE : event.when;
 				long waitTime = latestExpiredTime - System.currentTimeMillis();
-				if (waitTime < 0) waitTime = 0;
+				if (waitTime < 0)
+					waitTime = 0;
 				serverSelector.select(waitTime);
 				processFileEvent(serverSelector);
 				processTimeEvent(event);
@@ -248,11 +260,12 @@ public class Server {
 
 	class ServerTimeEvent extends TimeEvent {
 		private int lastExpiredDbIndex = 0;
+
 		ServerTimeEvent(long when) {
 			// TODO Auto-generated constructor stub
 			super(when);
 		}
-		
+
 		private void processAOF() {
 			if (aofState == AofState.AOF_ON && aof != null) {
 				if (syncPolicy == SyncPolicy.EVERY_SECOND) {
@@ -279,17 +292,17 @@ public class Server {
 				}
 			}
 		}
-		
-		private void processExpireKeys(){
+
+		private void processExpireKeys() {
 			List<Sds> expiredKeys = new ArrayList<>();
 			JedisDB db = Server.inUseDatabases[lastExpiredDbIndex];
-			for(Entry<Sds, Long> entry : db.expireKeys.entrySet()){
+			for (Entry<Sds, Long> entry : db.expireKeys.entrySet()) {
 				Sds key = entry.getKey();
-				if(db.isKeyExpired(key)){
+				if (db.isKeyExpired(key)) {
 					expiredKeys.add(key);
 				}
 			}
-			for(Sds key : expiredKeys){
+			for (Sds key : expiredKeys) {
 				db.removeExpiredKey(key);
 			}
 			lastExpiredDbIndex = (lastExpiredDbIndex + 1) % databaseNum;

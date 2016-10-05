@@ -122,10 +122,11 @@ public class JedisWorkbench {
 						}
 						readBuffer.flip();
 						String resp = new String(readBuffer.array()).trim();
-						if (cmd.equals("subscribe") 
+						if ((cmd.equals("subscribe") || cmd.equals("monitor"))
 								&& resp.equals("OK")) {
 							readBuffer.clear();
-							System.out.println("Subscribing...");
+							if(cmd.equals("monitor")) System.out.println(resp);
+							else System.out.println("Subscribing...");
 							Selector selector = Selector.open();
 							clientSocket.configureBlocking(false);
 							clientSocket.register(selector, SelectionKey.OP_READ);
