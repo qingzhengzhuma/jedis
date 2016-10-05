@@ -388,6 +388,7 @@ class SubscribeHandler extends CommandHandler{
 				clients = new LinkedList<>();
 				Server.subscribedChannels.put(channel, clients);
 			}
+			client.subscriedChannel.add(channel);
 			clients.add(client);
 		}
 		return MessageConstant.OK;

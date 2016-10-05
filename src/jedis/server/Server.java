@@ -10,6 +10,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -41,12 +42,13 @@ public class Server {
 	long lastSyncTime = System.currentTimeMillis();
 	static final long aofFileSizeThreshold = 1024 * 1024 * 256; // 256MB
 	static Map<Sds, List<JedisClient>> subscribedChannels;
-
+	static Set<JedisClient> monitors;
 	private Server() {
 		clients = new HashMap<>();
 		timeEvents = new LinkedList<>();
 		timeEvents.add(new ServerTimeEvent(System.currentTimeMillis()));
 		subscribedChannels = new HashMap<>();
+		monitors = new HashSet<>();
 	}
 
 	private TimeEvent getNearestTimeEvent() {
@@ -116,7 +118,16 @@ public class Server {
 			SocketChannel clientChannel = (SocketChannel) key.channel();
 			if (clientChannel != null) {
 				String address = clientChannel.getRemoteAddress().toString();
-				clients.remove(address);
+				JedisClient client = clients.remove(address);
+				if(client != null){
+					for(Sds channel : client.subscriedChannel){
+						List<JedisClient> clns = Server.subscribedChannels.get(channel);
+						if(clns != null){
+							clns.remove(client);
+						}
+					}
+					monitors.remove(client);
+				}
 				clientChannel.close();
 				System.out.println(address + " " + MessageConstant.CONNECTION_CLOSED);
 			}

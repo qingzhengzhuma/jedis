@@ -19,6 +19,7 @@ public class JedisClient{
 	SocketChannel channel;
 	MultiState multiState;
 	Set<Sds> watchedKeys;
+	Set<Sds> subscriedChannel;
 	Queue<CommandLine> multiCommandBuf;
 	
 	public JedisClient(String address,SocketChannel channel) {
@@ -28,7 +29,8 @@ public class JedisClient{
 		this.dirtyCas = false;
 		this.multiState = MultiState.NONE;
 		this.watchedKeys = new HashSet<>();
-		multiCommandBuf = new LinkedList<>();
+		this.multiCommandBuf = new LinkedList<>();
+		this.subscriedChannel = new HashSet<>();
 	}
 	
 	@Override
