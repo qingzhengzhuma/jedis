@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import jedis.util.CommandLine;
+import jedis.util.JedisObject;
 import jedis.util.Sds;
 
 public class Server {
@@ -137,6 +139,45 @@ public class Server {
 			return new String();
 		}
 	}
+	
+	void sendMsgToMonitor(Sds msg){
+		for(JedisClient client : monitors){
+			client.pushResult(msg);
+			client.sendResponse();
+		}
+	}
+	
+	boolean executeCommand(JedisClient client, byte[] data) {
+		CommandLine cl = new CommandLine();
+		boolean state = false;
+		if (cl.parse(new String(data))) {
+			String command = cl.getNormalizedCmd();
+			int argc = cl.getArgc();
+			if (CommandHandler.verifyCommand(command, argc) == true) {
+				try {
+					Sds msg = new Sds(cl.getCmdLine());
+					sendMsgToMonitor(msg);
+					CommandHandler handler = CommandHandler.getHandler(client, command);
+					JedisObject object = handler.execute(client, cl);
+					if (object == null)
+						object = MessageConstant.NIL;
+					state = true;
+					client.pushResult(object);
+				} catch (UnsupportedOperationException e) {
+					// TODO: handle exception
+					client.pushResult(MessageConstant.NOT_SUPPORTED_OPERATION);
+				} catch (IllegalArgumentException e) {
+					// TODO: handle exception
+					client.pushResult(MessageConstant.ILLEGAL_ARGUMENT);
+				}
+			}else{
+				client.pushResult(MessageConstant.ILLEGAL_COMMAND);
+			}
+		}else{
+			client.pushResult(MessageConstant.ILLEGAL_COMMAND);
+		}
+		return state;
+	}
     
 	private boolean handleCommand(JedisClient client) {
 		ByteBuffer buffer = ByteBuffer.allocate(1024);
@@ -150,7 +191,7 @@ public class Server {
 				buffer.flip();
 				if(buffer.hasArray()){
 					byte[] data = buffer.array();
-					boolean state = CommandHandler.executeCommand(client,data);
+					boolean state = executeCommand(client,data);
 					if(state == true){
 						for(JedisClient c : monitors){
 							c.pushResult(new Sds(data));

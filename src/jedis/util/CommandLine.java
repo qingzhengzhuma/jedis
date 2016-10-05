@@ -78,6 +78,16 @@ public class CommandLine {
 		return normalizedCmdLine;
 	}
 	
+	public String getCmdLine(){
+		if(normalizedCmdLine == null){
+			normalizedCmdLine = segs.get(0);
+			for(int i = 1; i < segs.size();++i){
+				normalizedCmdLine += " " + segs.get(i);
+			}
+		}
+		return normalizedCmdLine;
+	}
+	
 	public String getNormalizedCmd(){
 		if(normalizedCmd == null){
 			normalizedCmd = segs.get(0).toLowerCase();

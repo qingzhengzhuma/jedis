@@ -42,36 +42,6 @@ abstract public class CommandHandler {
 		}
 	}
 
-	public static boolean executeCommand(JedisClient client, byte[] data) {
-		CommandLine cl = new CommandLine();
-		boolean state = false;
-		if (cl.parse(new String(data))) {
-			String command = cl.getNormalizedCmd();
-			int argc = cl.getArgc();
-			if (CommandHandler.verifyCommand(command, argc) == true) {
-				try {
-					CommandHandler handler = CommandHandler.getHandler(client, command);
-					JedisObject object = handler.execute(client, cl);
-					if (object == null)
-						object = MessageConstant.NIL;
-					state = true;
-					client.pushResult(object);
-				} catch (UnsupportedOperationException e) {
-					// TODO: handle exception
-					client.pushResult(MessageConstant.NOT_SUPPORTED_OPERATION);
-				} catch (IllegalArgumentException e) {
-					// TODO: handle exception
-					client.pushResult(MessageConstant.ILLEGAL_ARGUMENT);
-				}
-			}else{
-				client.pushResult(MessageConstant.ILLEGAL_COMMAND);
-			}
-		}else{
-			client.pushResult(MessageConstant.ILLEGAL_COMMAND);
-		}
-		return state;
-	}
-
 	public static CommandHandler getHandler(JedisClient client, String cmd) {
 		if (client.multiState != MultiState.NONE) {
 			if (cmd.equals("exec")) return execHandler;	

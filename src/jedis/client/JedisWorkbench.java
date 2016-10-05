@@ -156,6 +156,7 @@ public class JedisWorkbench {
 	String tryMonitor(String commandline) throws IOException{
 		String resp = sendRequest(commandline);
 		if(resp.equals("OK")){
+			System.out.println(resp);
 			listen();
 		}
 		return resp;
