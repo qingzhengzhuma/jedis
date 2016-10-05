@@ -63,6 +63,8 @@ abstract public class CommandHandler {
 					// TODO: handle exception
 					client.pushResult(MessageConstant.ILLEGAL_ARGUMENT);
 				}
+			}else{
+				client.pushResult(MessageConstant.ILLEGAL_COMMAND);
 			}
 		}else{
 			client.pushResult(MessageConstant.ILLEGAL_COMMAND);
@@ -313,7 +315,6 @@ class PublishHandler extends CommandHandler{
 			response.append(channel);
 			response.append("\"\n3) ");
 			response.append(message);
-			response.append("\n");
 			for(JedisClient c : clients){
 				c.pushResult(response);
 				c.sendResponse();
