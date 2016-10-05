@@ -164,7 +164,7 @@ public class JedisWorkbench {
 	String trySubscribe(String commandline) throws IOException{
 		String resp = sendRequest(commandline);
 		if(resp.equals("OK")){
-			System.out.println("monitoring...");
+			System.out.println("subscribing...");
 			listen();
 		}
 		return resp;
