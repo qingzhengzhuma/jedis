@@ -93,7 +93,7 @@ public class JedisWorkbench {
 		}
 	}
 
-	public void listen() throws IOException {
+	void listen() throws IOException {
 		ByteBuffer readBuffer = ByteBuffer.allocate(1024);
 		Selector selector = Selector.open();
 		clientSocket.configureBlocking(false);
@@ -122,6 +122,10 @@ public class JedisWorkbench {
 			}
 		}
 	}
+	
+	public void close() throws IOException{
+		clientSocket.close();
+	}
 
 	void quit() throws IOException {
 		clientSocket.close();
@@ -129,7 +133,7 @@ public class JedisWorkbench {
 		System.exit(-1);
 	}
 
-	String sendRequest(String commandline) throws IOException {
+	public String sendRequest(String commandline) throws IOException {
 		ByteBuffer writeBuffer = wrapCommandToBuffer(commandline);
 		while (writeBuffer.hasRemaining()) {
 			clientSocket.write(writeBuffer);

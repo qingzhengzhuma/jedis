@@ -252,8 +252,8 @@ public class Server {
 					key.cancel();
 				}
 			}
+			iterator.remove();
 		}
-		iterator.remove();
 	}
 
 	private void processTimeEvent(TimeEvent event) {
