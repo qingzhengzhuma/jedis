@@ -1,6 +1,5 @@
 package jedis.util;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -9,10 +8,11 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 	private List<JedisEntry<K, V>>[] table;
 	private static final int DEFAULT_LENGTH = 16; 
 	private static final int MAX_LENGTH = 1<<30;
+	private final double loadFactor = 0.75;
 	private int length = 16;
 	private int lengthMask;
 	private int used;
-	private static double MAX_LOAD_FACTOR = 0.75;
+	private int threshold;
 	
 	final int hash(K key) {
         int h;
@@ -20,8 +20,9 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
     }
 	
 	final int getSizeFor(int capacity){
+		if(capacity <= DEFAULT_LENGTH) return DEFAULT_LENGTH;
 		int size = MAX_LENGTH;
-		while(size>>1 > capacity){
+		while(size>>1 >= capacity){
 			size >>= 1;
 		}
 		return size;
@@ -32,13 +33,14 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 		this(DEFAULT_LENGTH);
 	}
 	
-	@SuppressWarnings({"rawtypes","unchecked"})
+	@SuppressWarnings({"unchecked"})
 	public JedisHashTable(int capacity) {
 		// TODO Auto-generated constructor stub
-		if(capacity < DEFAULT_LENGTH) capacity = DEFAULT_LENGTH;
-		this.length = getSizeFor(capacity);
+		length = getSizeFor(capacity);
 		table = (List<JedisEntry<K, V>>[]) new LinkedList[length];
 		lengthMask = length - 1;
+		threshold = (int)loadFactor * length;
+		used = 0;
 	}
 	
 	public int getLength(){
@@ -49,30 +51,13 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 		return used;
 	}
 	
-	public V add(JedisEntry<K, V> entry){
+	V add(JedisEntry<K, V> entry){
 		V oldValue = null;
 		if(entry != null){
-			K key = entry.getKey();
-			V value = entry.getValue();
 			int hash = entry.getHash() & lengthMask;
-			List<JedisEntry<K, V>> candidates = table[hash];
-			boolean isContain = false;
-			if(candidates == null){
-				table[hash] = new LinkedList<>();
-			}else{
-				for(JedisEntry<K, V> e : candidates){
-					if(e.getKey().equals(key)){
-						oldValue = e.getValue();
-						e.setValue(value);
-						isContain = true;
-						break;
-					}
-				}
-			}
-			if(!isContain){
-				table[hash].add(entry);
-				++used;
-			}
+			if(table[hash] == null) table[hash] = new LinkedList<>();
+			table[hash].add(entry);
+			++used;
 		}
 		return oldValue;
 	}
@@ -97,6 +82,7 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 	public V remove(K key) {
 		int hash = hash(key) & lengthMask;
 		List<JedisEntry<K, V>> candidates = table[hash];
+		if(candidates == null) return null;
 		int index = -1,i = 0;
 		for(JedisEntry<K, V> entry : candidates){
 			if(entry.getKey().equals(key)){
@@ -116,6 +102,7 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 	public V put(K key, V value) {
 		int keyHash = hash(key);
 		int hash = keyHash & lengthMask;
+		if(table[hash] == null) table[hash] = new LinkedList<>();
 		List<JedisEntry<K, V>> candidates = table[hash];
 		V oldValue = null;
 		boolean isContain = false;
@@ -129,22 +116,38 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 		}
 		if(!isContain){
 			candidates.add(0,new JedisEntry<K,V>(key,value,keyHash));
-			++used;
+			if(++used > threshold);
+				//resize();
 		}
 		return oldValue;
+	}
+	
+	void resize(){
+		if(length == MAX_LENGTH) return;
+		int newSize = length * 2;
+		JedisHashTable<K, V> ht2 = new JedisHashTable<>(newSize);
+		Iterator<JedisEntry<K, V>> iterator =  iterator();
+		while(iterator.hasNext()){
+			ht2.add(iterator.next());
+		}
+		this.table = ht2.table;
+		this.used = ht2.used;
+		this.length = ht2.length;
+		this.lengthMask = this.length - 1;
+		this.threshold = ht2.threshold;
+		ht2 = null;
 	}
 
 	public boolean containsKey(K key) {
 		int hash = hash(key) & lengthMask;
 		List<JedisEntry<K, V>> candidates = table[hash];
-		boolean isContain = false;
+		if(candidates == null) return false;
 		for(JedisEntry<K, V> entry : candidates){
 			if(entry.getKey().equals(key)){
-				isContain = true;
-				break;
+				return true;
 			}
 		}
-		return isContain;
+		return false;
 	}
 	
 	public JedisHashTable<K, V> copy(){
@@ -152,7 +155,9 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 		for(int i = 0; i < length;++i){
 			List<JedisEntry<K, V>> candidates = table[i];
 			for(JedisEntry<K, V> entry : candidates){
+				@SuppressWarnings("unchecked")
 				K key = (K)entry.getKey().deepCopy();
+				@SuppressWarnings("unchecked")
 				V value = (V)entry.getValue().deepCopy();
 				int hash = entry.getHash();
 				ht.table[i].add(0,new JedisEntry<K, V>(key, value,hash));
@@ -166,15 +171,23 @@ public class JedisHashTable<K extends JedisObject, V extends JedisObject> {
 	public Iterator<JedisEntry<K, V>> iterator(){
 		return new Iterator<JedisEntry<K,V>>() {
 			int i = 0;
-			Iterator<JedisEntry<K, V>> iterator = table[0].iterator();
+			Iterator<JedisEntry<K, V>> iterator = null;
+			{
+				while(i < length && table[i] == null){
+					++i;
+				}
+				if(i < length) iterator = table[i].iterator();
+			}
 			
 			@Override
 			public boolean hasNext() {
 				// TODO Auto-generated method stub
-				while(!iterator.hasNext() && i < length){
-					iterator = table[i].iterator();
-				}
-				return iterator.hasNext();
+				if(i < length && iterator.hasNext()) return true;
+				while(++i < length && 
+						(table[i] == null || 
+						!table[i].iterator().hasNext()));
+				if(i < length) iterator = table[i].iterator();
+				return i < length && iterator.hasNext();
 			}
 
 			@Override

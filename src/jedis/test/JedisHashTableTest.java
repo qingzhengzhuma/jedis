@@ -74,6 +74,7 @@ public class JedisHashTableTest {
 		JedisHashTable<Sds, JedisObject> hashTable = new JedisHashTable<>();
 		Sds key = new Sds("msg");
 		JedisObject value = new Sds("Hello World");
+		//JedisObject
 		JedisObject value1 = new Sds("Another world");
 		assertEquals(null,hashTable.put(key, value));
 		assertEquals(value, hashTable.put(key, value1));

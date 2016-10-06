@@ -12,6 +12,8 @@ import jedis.util.JedisObject;
 import jedis.util.Sds;
 
 public class JedisMapTest {
+	
+	int testCount = 10000;
 
 	@Test
 	public void testGet() {
@@ -71,19 +73,37 @@ public class JedisMapTest {
 	}
 	
 	@Test
+	public void testJedisMap() {
+		JedisMap<Sds, JedisObject> map = new JedisMap<>();
+		
+		for(int i = 1; i <= testCount;++i){
+			map.put(new Sds(Integer.toString(i)), new Sds(Integer.toString(i+1)));
+		}
+		
+		HashMap<Sds, JedisObject> jdkmap = new HashMap<>();
+		for(int i = 1; i <= testCount;++i){
+			jdkmap.put(new Sds(Integer.toString(i)), new Sds(Integer.toString(i+1)));
+		}
+		
+		for(int i = 1; i <= testCount;++i){
+			assertEquals(map.get(new Sds(Integer.toString(i))), jdkmap.get(new Sds(Integer.toString(i))));
+		}
+	}
+	
+	@Test
 	public void testJedisMapPerformance() {
 		JedisMap<Sds, JedisObject> map = new JedisMap<>();
 		
-		for(int i = 1; i <= 100000;++i){
+		for(int i = 1; i <= testCount;++i){
 			map.put(new Sds(Integer.toString(i)), new Sds(Integer.toString(i+1)));
 		}
 	}
 	
 	@Test
 	public void testJdkMapPerformance() {
-		HashMap<Sds, JedisObject> map = new HashMap<>();
-		for(int i = 1; i <= 400000;++i){
-			map.put(new Sds(Integer.toString(i)), new Sds(Integer.toString(i+1)));
+		HashMap<Sds, JedisObject> jmap = new HashMap<>();
+		for(int i = 1; i <= testCount;++i){
+			jmap.put(new Sds(Integer.toString(i)), new Sds(Integer.toString(i+1)));
 		}
 	}
 

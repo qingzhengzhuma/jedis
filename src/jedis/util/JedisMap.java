@@ -16,40 +16,36 @@ import java.util.List;
 public class JedisMap<K extends JedisObject,V extends JedisObject>{
 
 	private JedisHashTable<K, V> ht1;
-	private JedisHashTable<K, V> ht2;
+	//private JedisHashTable<K, V> ht2;
 	public JedisMap() {
 		// TODO Auto-generated constructor stub
 		ht1 = new JedisHashTable<>();
-		ht2 = null;
+		//ht2 = null;
 	}
 	
 	public V get(K key){
 		V value = ht1.get(key);
-		if(value == null && ht2 != null) value = ht2.get(key);
+		//if(value == null && ht2 != null) value = ht2.get(key);
 		return value;
 	}
 	
 	public V put(K key,V value){
 		resize();
-		if(ht2 != null){
+		/*if(ht2 != null){
 			V oldValue = ht1.remove(key);
 			V old1 = ht2.put(key, value);
 			if(oldValue == null) oldValue = old1;
 			return oldValue;
-		}
+		}*/
 		return ht1.put(key, value);
 	}
 	
 	public boolean containsKey(K key){
-		return ht1.containsKey(key) || (ht2 != null && ht2.containsKey(key));
+		return ht1.containsKey(key);
 	}
 	
 	public V remove(K key){
-		V value = null;
-		value = ht1.remove(key);
-		V v1 = ht2 == null ? null : ht2.remove(key);
-		if(value == null) value = v1;
-		return value;
+		return ht1.remove(key);
 	}
 	
 	/**
@@ -59,7 +55,6 @@ public class JedisMap<K extends JedisObject,V extends JedisObject>{
 	public JedisMap<K, V> copy(){
 		JedisMap<K, V> newMap = new JedisMap<>();
 		newMap.ht1 = ht1.copy();
-		newMap.ht2 = ht2 == null ? null : ht2.copy();
 		return newMap;
 	}
 	
@@ -76,7 +71,7 @@ public class JedisMap<K extends JedisObject,V extends JedisObject>{
 			}
 			newSize = Math.max(newSize, 16);
 		}
-		ht2 = new JedisHashTable<>(newSize);
+		JedisHashTable<K, V> ht2 = new JedisHashTable<>(newSize);
 		Iterator<JedisEntry<K, V>> iterator =  ht1.iterator();
 		while(iterator.hasNext()){
 			ht2.add(iterator.next());
