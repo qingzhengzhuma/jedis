@@ -2,6 +2,7 @@ package jedis.server;
 
 import java.util.LinkedList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import jedis.util.CommandLine;
 import jedis.util.JedisObject;
@@ -277,18 +278,22 @@ class PublishHandler extends CommandHandler{
 		// TODO Auto-generated method stub
 		String channel = cl.getArg(0);
 		String message = cl.getArg(1);
-		List<JedisClient> clients = Server.subscribedChannels.get(new Sds(channel));
 		int count = 0;
-		if(clients != null){
-			Sds response = new Sds("1) \"message\"\n");
-			response.append("2) \"");
-			response.append(channel);
-			response.append("\"\n3) ");
-			response.append(message);
-			for(JedisClient c : clients){
-				c.pushResult(response);
-				c.sendResponse();
-				++count;
+		Sds response = new Sds("1) \"message\"\n");
+		response.append("2) \"");
+		response.append(channel);
+		response.append("\"\n3) ");
+		response.append(message);
+		for(String ch : Server.subscribedChannels.keySet()){
+			if(channel.matches(ch)){
+				List<JedisClient> clients = Server.subscribedChannels.get(ch);
+				if(clients != null){
+					for(JedisClient c : clients){
+						c.pushResult(response);
+						c.sendResponse();
+						++count;
+					}
+				}
 			}
 		}
 		return new Sds(Integer.toString(count));
@@ -370,7 +375,11 @@ class SubscribeHandler extends CommandHandler{
 		// TODO Auto-generated method stub
 		int channelCount = cl.getArgc();
 		for(int i = 0; i < channelCount;++i){
-			Sds channel = new Sds(cl.getArg(i));
+			Pattern.compile(cl.getArg(i));
+		}
+		for(int i = 0; i < channelCount;++i){
+			String channel = cl.getArg(i);
+			Pattern.compile(channel);
 			List<JedisClient> clients = Server.subscribedChannels.get(channel);
 			if(clients == null){
 				clients = new LinkedList<>();

@@ -21,7 +21,7 @@ public class JedisClient{
 	boolean dirtyCas;
 	MultiState multiState;
 	Set<Sds> watchedKeys;
-	Set<Sds> subscriedChannel;
+	Set<String> subscriedChannel;
 	Queue<CommandLine> multiCommandBuf;
 	Queue<JedisObject> resultBuf;
 	

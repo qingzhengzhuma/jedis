@@ -41,7 +41,7 @@ public class Server {
 	List<TimeEvent> timeEvents;
 	long lastSyncTime = System.currentTimeMillis();
 	static final long aofFileSizeThreshold = 1024 * 1024 * 256; // 256MB
-	static Map<Sds, List<JedisClient>> subscribedChannels;
+	static Map<String, List<JedisClient>> subscribedChannels;
 	static Set<JedisClient> monitors;
 
 	private Server() {
@@ -116,7 +116,7 @@ public class Server {
 				String address = client.address;
 				clients.remove(address);
 				if (client != null) {
-					for (Sds channel : client.subscriedChannel) {
+					for (String channel : client.subscriedChannel) {
 						List<JedisClient> clns = Server.subscribedChannels.get(channel);
 						if (clns != null) {
 							clns.remove(client);
