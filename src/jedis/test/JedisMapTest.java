@@ -1,9 +1,8 @@
 package jedis.test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import java.util.HashMap;
-import java.util.Map;
 
 import org.junit.Test;
 
@@ -13,7 +12,7 @@ import jedis.util.Sds;
 
 public class JedisMapTest {
 	
-	int testCount = 10000;
+	int testCount = 10000000;
 
 	@Test
 	public void testGet() {
@@ -72,7 +71,7 @@ public class JedisMapTest {
 		assertEquals(value1, map.remove(key1));
 	}
 	
-	@Test
+	//@Test
 	public void testJedisMap() {
 		JedisMap<Sds, JedisObject> map = new JedisMap<>();
 		
@@ -90,7 +89,7 @@ public class JedisMapTest {
 		}
 	}
 	
-	@Test
+	//@Test
 	public void testJedisMapPerformance() {
 		JedisMap<Sds, JedisObject> map = new JedisMap<>();
 		

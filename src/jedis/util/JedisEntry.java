@@ -5,11 +5,13 @@ public class JedisEntry<K extends JedisObject,V extends JedisObject>{
 	private K key;
 	private V value;
 	private int hash;
+	JedisEntry<K, V> next;
 	
 	public JedisEntry(K key,V value,int hash){
 		this.key = key;
 		this.value = value;
 		this.hash = hash;
+		this.next = null;
 	}
 
 	public K getKey() {

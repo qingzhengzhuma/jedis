@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 
 public class Sds implements JedisObject{
+	private static int DICT_HASH_FUNCTION_SEED = 5381;
 	private static JedisObject TYPE = new Sds("STRING");
 	private static final byte typeCode = '0'; 
 	private int used;
@@ -69,9 +70,11 @@ public class Sds implements JedisObject{
 		return true;
 	}
 	
+	
+	//TODO: process overflow
 	@Override
 	public int hashCode() {
-		int result = 23;
+		int result = 17;
 		result = 37*result + used;
 		for(int i = 0; i < used;++i){
 			result = result*37 + content[i];
